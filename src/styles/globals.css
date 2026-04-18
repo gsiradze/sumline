@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --paper-50: #fdfbf6;
+    --paper-100: #faf6f0;
+    --paper-200: #f2ece0;
+    --paper-300: #e7dfcf;
+    --paper-400: #d4c9b3;
+    --rule-200: #e2d8c3;
+    --rule-300: #c9bda3;
+
+    --ink-900: #2a2722;
+    --ink-700: #4a453c;
+    --ink-500: #726b5e;
+    --ink-400: #8e8675;
+    --ink-300: #a79f8b;
+
+    --ink-fill-900: #1f2a3a;
+    --ink-fill-800: #263348;
+    --ink-fill-700: #334158;
+
+    --sage-700: #4e6b4a;
+    --sage-600: #5e7f59;
+    --sage-500: #7b9875;
+    --sage-300: #b7cab0;
+    --sage-100: #e3eade;
+
+    --clay-700: #8e3a20;
+    --clay-600: #a84a2a;
+    --clay-500: #c46a47;
+    --clay-300: #e3ae94;
+    --clay-100: #f3dccf;
+
+    --ochre-700: #8b6b1e;
+    --ochre-600: #a9842b;
+    --ochre-500: #c39a3e;
+    --ochre-300: #e3c783;
+    --ochre-100: #f3e5be;
+
+    --sh-1: 0 1px 2px rgba(60, 42, 20, 0.06), 0 0 0 0.5px rgba(60, 42, 20, 0.05);
+    --sh-2: 0 2px 6px rgba(60, 42, 20, 0.07), 0 1px 2px rgba(60, 42, 20, 0.05);
+    --sh-3: 0 6px 18px rgba(60, 42, 20, 0.09), 0 2px 4px rgba(60, 42, 20, 0.05);
+    --sh-ink: inset 0 1px 2px rgba(20, 24, 40, 0.35), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .dark {
+    --paper-50: #2a231e;
+    --paper-100: #1c1815;
+    --paper-200: #241e1a;
+    --paper-300: #2f2823;
+    --paper-400: #3b332c;
+    --rule-200: #3b332c;
+    --rule-300: #4e453b;
+
+    --ink-900: #ede6d8;
+    --ink-700: #d2c9b7;
+    --ink-500: #a79d89;
+    --ink-400: #8a7f6c;
+    --ink-300: #6a6152;
+
+    --ink-fill-900: #c9d1e3;
+    --ink-fill-800: #b7c0d4;
+    --ink-fill-700: #99a2b7;
+
+    --sage-700: #b6caa9;
+    --sage-600: #9db692;
+    --sage-500: #89a47d;
+    --sage-300: #4c5f47;
+    --sage-100: #2f3a2c;
+
+    --clay-700: #e9b79c;
+    --clay-600: #d69977;
+    --clay-500: #be7a56;
+    --clay-300: #6b3a22;
+    --clay-100: #3f2517;
+
+    --ochre-700: #e9d39a;
+    --ochre-600: #d7bb6d;
+    --ochre-500: #c39a3e;
+    --ochre-300: #6a5320;
+    --ochre-100: #3c2f15;
+
+    --sh-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.5);
+    --sh-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --sh-3: 0 6px 18px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+  }
+
+  body {
+    font-family: var(--sans, 'Geist', ui-sans-serif, system-ui, sans-serif);
+    color: var(--ink-900);
+    background-color: var(--paper-100);
+    background-image:
+      radial-gradient(rgba(120, 100, 60, 0.035) 1px, transparent 1px),
+      radial-gradient(rgba(120, 100, 60, 0.025) 1px, transparent 1px);
+    background-size:
+      3px 3px,
+      7px 7px;
+    background-position:
+      0 0,
+      1px 2px;
+    font-feature-settings: 'ss01', 'ss02', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    overscroll-behavior: none;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
