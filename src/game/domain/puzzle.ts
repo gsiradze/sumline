@@ -2,34 +2,46 @@ import { mulberry32, shuffle } from './rng';
 import type { Rng } from './rng';
 import { CELL_COUNT, MAX_FILLED, MIN_FILLED } from './types';
 import type { Cell, Grid, Puzzle } from './types';
-import { colSums, isUniquelySolvableFromSums, rowSums } from './solver';
+import { colSums, rowSums } from './solver';
 
 const MAX_ATTEMPTS_PER_SEED = 500;
 const MAX_NUDGES = 50;
 const NUDGE_STEP = 0x9e3779b9;
 
-export function generatePuzzle(seed: number): Puzzle {
-  for (let nudge = 0; nudge < MAX_NUDGES; nudge++) {
-    const candidate = tryGenerate((seed + nudge * NUDGE_STEP) >>> 0);
-    if (candidate) return candidate;
-  }
-  throw new Error(`failed to generate a valid puzzle after ${MAX_NUDGES} seed nudges`);
+export interface GenerateOptions {
+  readonly accept?: (puzzle: Puzzle) => boolean;
+  readonly minFilled?: number;
+  readonly maxFilled?: number;
+  readonly maxAttemptsPerSeed?: number;
+  readonly maxNudges?: number;
 }
 
-function tryGenerate(seed: number): Puzzle | null {
+export function generatePuzzle(seed: number, opts: GenerateOptions = {}): Puzzle {
+  const nudges = opts.maxNudges ?? MAX_NUDGES;
+  for (let nudge = 0; nudge < nudges; nudge++) {
+    const candidate = tryGenerate((seed + nudge * NUDGE_STEP) >>> 0, opts);
+    if (candidate) return candidate;
+  }
+  throw new Error(`failed to generate a valid puzzle after ${nudges} seed nudges`);
+}
+
+function tryGenerate(seed: number, opts: GenerateOptions): Puzzle | null {
   const rng = mulberry32(seed);
-  for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_SEED; attempt++) {
-    const filledCount = MIN_FILLED + Math.floor(rng() * (MAX_FILLED - MIN_FILLED + 1));
+  const attempts = opts.maxAttemptsPerSeed ?? MAX_ATTEMPTS_PER_SEED;
+  const lo = opts.minFilled ?? MIN_FILLED;
+  const hi = opts.maxFilled ?? MAX_FILLED;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const filledCount = lo + Math.floor(rng() * (hi - lo + 1));
     const grid = randomGrid(rng, filledCount);
-    if (!passesDifficultyHeuristic(grid)) continue;
-    if (!isUniquelySolvableFromSums(grid)) continue;
-    return {
+    const puzzle: Puzzle = {
       solution: grid,
       rowSums: rowSums(grid),
       colSums: colSums(grid),
       filledCount,
       seed,
     };
+    if (opts.accept && !opts.accept(puzzle)) continue;
+    return puzzle;
   }
   return null;
 }
@@ -44,13 +56,4 @@ function randomGrid(rng: Rng, filledCount: number): Grid {
     cells[indices[i] ?? 0] = 1;
   }
   return cells;
-}
-
-function passesDifficultyHeuristic(grid: Grid): boolean {
-  const rs = rowSums(grid);
-  const cs = colSums(grid);
-  let trivial = 0;
-  for (const s of rs) if (s === 0 || s === 5) trivial++;
-  for (const s of cs) if (s === 0 || s === 5) trivial++;
-  return trivial <= 2;
 }

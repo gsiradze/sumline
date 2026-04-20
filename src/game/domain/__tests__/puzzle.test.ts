@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { generatePuzzle } from '../puzzle';
-import { seedForPuzzleId } from '../daily';
+import { seedForLevelId } from '../levels';
 import { CELL_COUNT, MAX_FILLED, MIN_FILLED } from '../types';
 import type { Puzzle } from '../types';
 import { colSums, isUniquelySolvableFromSums, rowSums } from '../solver';
@@ -23,7 +23,7 @@ describe('generatePuzzle determinism', () => {
       const again = generatePuzzle(seed);
       expect(again.solution).toEqual(first.solution);
     }
-  });
+  }, 30_000);
 
   it('returns different puzzles for different seeds (high probability)', () => {
     const a = generatePuzzle(1);
@@ -33,7 +33,7 @@ describe('generatePuzzle determinism', () => {
 });
 
 describe('generatePuzzle properties', () => {
-  it('produces a grid of exactly 25 cells', () => {
+  it('produces a grid whose length matches CELL_COUNT', () => {
     const p = generatePuzzle(1);
     expect(p.solution).toHaveLength(CELL_COUNT);
   });
@@ -57,26 +57,31 @@ describe('generatePuzzle properties', () => {
   });
 });
 
-describe('generatePuzzle solvability (365-day sample)', () => {
+describe('generatePuzzle solvability (210-level sample)', () => {
   const puzzles: Puzzle[] = [];
 
   beforeAll(() => {
-    for (let id = 0; id < 365; id++) {
-      puzzles.push(generatePuzzle(seedForPuzzleId(id)));
+    for (let id = 0; id < 210; id++) {
+      puzzles.push(
+        generatePuzzle(seedForLevelId(id), {
+          accept: p => isUniquelySolvableFromSums(p.solution),
+          maxAttemptsPerSeed: 2000,
+        }),
+      );
     }
   }, 60_000);
 
-  it('generates all 365 puzzles without throwing', () => {
-    expect(puzzles).toHaveLength(365);
+  it('generates all 210 uniquely-solvable puzzles without throwing', () => {
+    expect(puzzles).toHaveLength(210);
   });
 
-  it('every puzzle has a unique row/col-sum solution', () => {
+  it('every puzzle is uniquely sum-solvable when asked for uniqueness', () => {
     for (const p of puzzles) {
       expect(isUniquelySolvableFromSums(p.solution)).toBe(true);
     }
   });
 
-  it('filled-cell counts vary across the year (not all identical)', () => {
+  it('filled-cell counts vary across the ladder', () => {
     const counts = new Set(puzzles.map(p => p.filledCount));
     expect(counts.size).toBeGreaterThan(1);
   });

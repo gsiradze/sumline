@@ -2,12 +2,12 @@
   "name": "grid",
   "private": true,
   "version": "0.1.0",
-  "description": "A daily 5×5 deduction puzzle — one per day, six guesses.",
+  "description": "A 6×6 deduction puzzle with 210 levels across 5 difficulty tiers.",
   "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:puzzles && tsc --noEmit && vite build",
+    "build": "npm run build:levels && tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts",
     "format": "prettier --write .",
-    "build:puzzles": "tsx scripts/build-puzzles.ts"
+    "build:levels": "tsx scripts/build-levels.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "phaser": "4.0.0",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@playwright/test": "^1.59.1",
     "@types/node": "22.19.17",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",

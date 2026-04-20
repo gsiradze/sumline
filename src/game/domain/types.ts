@@ -1,8 +1,9 @@
-export const GRID_SIZE = 5;
+export const GRID_SIZE = 6;
 export const CELL_COUNT = GRID_SIZE * GRID_SIZE;
-export const MAX_GUESSES = 6;
-export const MIN_FILLED = 10;
-export const MAX_FILLED = 14;
+export const MIN_FILLED = 14;
+export const MAX_FILLED = 22;
+export const BATCH_SIZE = 7;
+export const MAX_GUESS_BUDGET = 8;
 
 export type Cell = 0 | 1;
 
@@ -16,6 +17,14 @@ export enum Feedback {
 }
 
 export type FeedbackGrid = readonly Feedback[];
+
+export enum Tier {
+  Beginner = 'beginner',
+  Intermediate = 'intermediate',
+  Advanced = 'advanced',
+  Expert = 'expert',
+  Master = 'master',
+}
 
 export interface Puzzle {
   readonly solution: Grid;
