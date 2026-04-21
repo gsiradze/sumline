@@ -98,7 +98,7 @@ export function WinScreen({ state, levelId, stars, onNext, onBack }: WinScreenPr
       className="px-4 pt-3 text-center"
       role="status"
       aria-live="polite"
-      style={{ paddingBottom: 'max(28px, env(safe-area-inset-bottom))' }}
+      style={{ paddingBottom: '140px' }}
     >
       <div className="mt-2 inline-flex gap-1">
         {[0, 1, 2].map(i => (
@@ -144,16 +144,23 @@ export function WinScreen({ state, levelId, stars, onNext, onBack }: WinScreenPr
         </div>
       </div>
 
-      <div className="mt-5">
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 px-4 pt-6"
+        style={{
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+          background:
+            'linear-gradient(to top, var(--paper-100) 55%, rgba(250,246,240,0.95) 80%, rgba(250,246,240,0) 100%)',
+        }}
+      >
         {onNext && (
           <button
             type="button"
             onClick={onNext}
-            className="relative w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold overflow-hidden active:scale-[0.98] transition-transform duration-nudge"
+            className="relative w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold overflow-hidden active:scale-[0.98] transition-transform duration-nudge shadow-sh-2"
           >
             {!cancelled && (
               <span
-                className="absolute left-0 top-0 bottom-0 bg-white/[0.08] transition-[width] duration-[100ms] ease-linear"
+                className="absolute left-0 top-0 bottom-0 bg-white/[0.12] transition-[width] duration-[100ms] ease-linear"
                 style={{ width: `${progress * 100}%` }}
                 aria-hidden="true"
               />
@@ -166,7 +173,7 @@ export function WinScreen({ state, levelId, stars, onNext, onBack }: WinScreenPr
             </span>
           </button>
         )}
-        <div className="mt-3 flex items-center justify-between px-1">
+        <div className="mt-2.5 flex items-center justify-between px-1">
           {onNext && !cancelled ? (
             <button
               type="button"
