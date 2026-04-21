@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { HomeScreen } from './components/HomeScreen';
 import { TierView } from './components/TierView';
 import { StatsModal } from './components/StatsModal';
-import { SpeakerOffIcon, SpeakerOnIcon } from './components/icons';
+import { Splash } from './components/Splash';
 import {
   getMuted,
   purgeLegacyKeys,
@@ -25,9 +25,23 @@ type View =
   | { readonly kind: 'tier'; readonly tier: Tier }
   | { readonly kind: 'level'; readonly levelId: number };
 
+const SPLASH_KEY = 'sumline.splash.shown';
+
+function shouldShowSplash(): boolean {
+  try {
+    if (typeof sessionStorage === 'undefined') return true;
+    if (sessionStorage.getItem(SPLASH_KEY)) return false;
+    sessionStorage.setItem(SPLASH_KEY, '1');
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 export default function App() {
   const [view, setView] = useState<View>({ kind: 'home' });
   const [statsOpen, setStatsOpen] = useState(false);
+  const [splashing, setSplashing] = useState(shouldShowSplash);
   const { progress, recordLevelWin } = useProgress();
   const { stats, onWin: onStatsWin, onLoss: onStatsLoss } = useStats();
   const [muted, setMutedState] = useState(() => getMuted());
@@ -74,21 +88,6 @@ export default function App() {
     [handlePickLevel, handleBackToHome],
   );
 
-  const muteButton = (
-    <button
-      type="button"
-      onClick={handleToggleMute}
-      aria-label={muted ? 'Unmute sound' : 'Mute sound'}
-      className="fixed top-3 right-3 z-40 w-9 h-9 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
-    >
-      {muted ? (
-        <SpeakerOffIcon className="w-4 h-4" />
-      ) : (
-        <SpeakerOnIcon className="w-4 h-4" />
-      )}
-    </button>
-  );
-
   const statsOverlay = statsOpen ? (
     <StatsModal
       stats={stats}
@@ -97,17 +96,22 @@ export default function App() {
     />
   ) : null;
 
+  const splashOverlay = splashing ? <Splash onDone={() => setSplashing(false)} /> : null;
+
   if (view.kind === 'home') {
     return (
       <>
-        {muteButton}
         <HomeScreen
           progress={progress}
           stats={stats}
+          muted={muted}
+          onToggleMute={handleToggleMute}
           onPickTier={handlePickTier}
+          onPickLevel={handlePickLevel}
           onOpenStats={() => setStatsOpen(true)}
         />
         {statsOverlay}
+        {splashOverlay}
       </>
     );
   }
@@ -115,7 +119,6 @@ export default function App() {
   if (view.kind === 'tier') {
     return (
       <>
-        {muteButton}
         <TierView
           tier={view.tier}
           progress={progress}
@@ -123,6 +126,7 @@ export default function App() {
           onPickLevel={handlePickLevel}
         />
         {statsOverlay}
+        {splashOverlay}
       </>
     );
   }
@@ -130,7 +134,6 @@ export default function App() {
   const level = bakedLevel(view.levelId);
   return (
     <>
-      {muteButton}
       <Suspense fallback={<LevelGameFallback />}>
         <LevelGameView
           key={view.levelId}

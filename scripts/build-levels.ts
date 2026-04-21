@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { TIER_CONFIGS, TOTAL_LEVELS } from '../src/game/domain/tiers';
 import { coordsForLevelId } from '../src/game/domain/levels';
-import { Tier } from '../src/game/domain/types';
+import type { Tier } from '../src/game/domain/types';
 import type { BakedLevel, Manifest, WorkerResult } from './build-levels-types';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

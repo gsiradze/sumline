@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { ActiveGameState } from '../../game/domain/game-state';
 import { Feedback } from '../../game/domain/types';
-import { ArrowLeftIcon } from './icons';
 import type { UseRetry } from '../hooks/useRetry';
 
 interface RetryGateProps {
@@ -38,51 +37,54 @@ export function RetryGate({ state, retry, onRetry, onBack }: RetryGateProps) {
     }
   }, [retry, onRetry]);
 
+  const isFree = retry.canFreeRetry;
+
   return (
-    <section className="px-5 pt-3 pb-6 text-center" role="status" aria-live="polite">
+    <section
+      className="px-4 pt-2 text-center"
+      role="status"
+      aria-live="polite"
+      style={{ paddingBottom: 'max(28px, env(safe-area-inset-bottom))' }}
+    >
       <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-clay-700">
-        Out of guesses —
+        Out of guesses
       </div>
-      <h2 className="font-serif text-[36px] font-semibold leading-[1.05] tracking-[-0.02em] text-ink-900 mt-1">
-        Next time.
+      <h2 className="font-serif text-[26px] font-medium leading-[1.1] tracking-[-0.01em] text-ink-900 mt-1.5">
+        The answer was —
       </h2>
-      <p className="font-sans text-[15px] leading-[1.5] text-ink-700 mt-3">
+      <p className="mt-2 font-sans text-[13px] text-ink-500">
         You were{' '}
-        <span className="font-serif text-[18px] font-semibold text-clay-700 tabular-nums">
+        <span className="font-serif text-[15px] font-semibold text-clay-700 tabular-nums">
           {cellsAway}
         </span>{' '}
         {cellsAway === 1 ? 'cell' : 'cells'} away.
       </p>
 
-      <div className="mt-5 flex flex-col items-center gap-2">
-        {retry.canFreeRetry ? (
-          <button
-            type="button"
-            onClick={handleFreeRetry}
-            className="w-full max-w-xs font-sans text-[15px] font-semibold tracking-[0.02em] text-paper-100 bg-fill-800 rounded-md py-3 shadow-sh-2 active:scale-[0.97] transition-transform duration-nudge"
-          >
-            Try again
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleAdRetry}
-            disabled={pending}
-            className="w-full max-w-xs font-sans text-[15px] font-semibold tracking-[0.02em] text-paper-100 bg-fill-800 rounded-md py-3 shadow-sh-2 active:scale-[0.97] transition-transform duration-nudge disabled:opacity-60"
-          >
-            {pending
+      <div className="mt-5">
+        <button
+          type="button"
+          onClick={isFree ? handleFreeRetry : handleAdRetry}
+          disabled={pending}
+          className="w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold inline-flex items-center justify-center gap-2.5 shadow-sh-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60"
+        >
+          {isFree
+            ? 'Try again'
+            : pending
               ? 'Loading ad…'
               : retry.canAdRetry
-                ? `Use retry (${retry.retry.adRetriesRemaining} left)`
-                : 'Watch ad · get 2 retries'}
-          </button>
-        )}
+                ? `Use retry · ${retry.retry.adRetriesRemaining} left`
+                : 'Watch ad · retry'}
+          {isFree && (
+            <span className="font-mono text-[9px] tracking-[0.08em] uppercase px-1.5 py-[3px] rounded-[3px] bg-ochre-500 text-fill-800 font-bold">
+              FREE
+            </span>
+          )}
+        </button>
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500 hover:text-ink-900 mt-2"
+          className="mt-2.5 w-full h-11 rounded-[12px] bg-paper-50 border border-rule-200 text-ink-700 font-sans text-[14px] font-medium active:scale-[0.98] transition-transform duration-nudge"
         >
-          <ArrowLeftIcon className="w-3.5 h-3.5" />
           Back to levels
         </button>
       </div>

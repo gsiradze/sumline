@@ -3,9 +3,7 @@ import { PhaserGame } from '../PhaserGame';
 import { useGameState } from '../hooks/useGameState';
 import { useAudioFx } from '../hooks/useAudioFx';
 import { useRetry } from '../hooks/useRetry';
-import { HeroCounter } from './HeroCounter';
 import { SubmitButton } from './SubmitButton';
-import { HistoryStrip } from './HistoryStrip';
 import { LastGuessSummary } from './LastGuessSummary';
 import { RulesModal } from './RulesModal';
 import { HintButton } from './HintButton';
@@ -15,7 +13,7 @@ import { RetryGate } from './RetryGate';
 import { ArrowLeftIcon, QuestionIcon } from './icons';
 import { getRulesShown, setRulesShown } from '../../storage/persistence';
 import { GameOutcome } from '../../game/domain/types';
-import { guessesRemaining, markedCount } from '../../game/domain/game-state';
+import { guessesRemaining } from '../../game/domain/game-state';
 import { starsForWin } from '../../game/domain/stars';
 import type { Stars } from '../../game/domain/stars';
 import { coordsForLevelId, progressForLevel } from '../../game/domain/levels';
@@ -95,12 +93,10 @@ export function LevelGameView({
   }, [game]);
 
   const remaining = guessesRemaining(game.state);
-  const marked = markedCount(game.state);
   const isTerminal = game.state.outcome !== GameOutcome.InProgress;
   const config = configForTier(level.tier);
 
-  const nextLevelId =
-    level.id + 1 < TOTAL_LEVELS ? level.id + 1 : null;
+  const nextLevelId = level.id + 1 < TOTAL_LEVELS ? level.id + 1 : null;
   const onNext = useCallback(() => {
     if (nextLevelId !== null) onGotoLevel(nextLevelId);
     else onBack();
@@ -117,46 +113,53 @@ export function LevelGameView({
       : 0;
 
   return (
-    <main className="min-h-screen flex flex-col font-sans text-ink-900 bg-paper-100">
-      <header className="px-5 pt-5 pb-3 flex items-baseline justify-between border-b border-rule-200">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onBack}
-            className="-ml-1 p-1 text-ink-500 hover:text-ink-900"
-            aria-label="Back to levels"
-          >
-            <ArrowLeftIcon className="w-5 h-5" />
-          </button>
-          <div>
-            <div className="font-mono text-[10px] tracking-[0.14em] uppercase text-ink-500">
-              {tierLabel} · Set {setNumber} · {withinSet} of 7
-            </div>
-            <h1 className="font-serif text-[22px] font-semibold leading-tight tracking-[-0.01em] mt-0.5">
-              Level {level.id + 1}
-            </h1>
+    <main
+      className="min-h-screen flex flex-col font-sans text-ink-900 bg-paper-100 select-none"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+      }}
+    >
+      <header className="px-4 pt-[18px] pb-2.5 flex items-start justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back to levels"
+          className="w-9 h-9 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+        >
+          <ArrowLeftIcon className="w-[18px] h-[18px]" />
+        </button>
+        <div className="flex-1 text-center mt-0.5">
+          <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">
+            {tierLabel} · Set {setNumber} · {withinSet} / 7
           </div>
+          <h1 className="font-serif text-[22px] font-medium leading-[1.15] tracking-[-0.01em] text-ink-900 mt-0.5">
+            Level {level.id + 1}
+          </h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="text-right font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">
-            <div>
-              {remaining} / {level.guessBudget} left
-            </div>
-          </div>
           <button
             type="button"
             onClick={() => setShowRules(true)}
             aria-label="Show rules"
-            className="w-8 h-8 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+            className="w-9 h-9 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
           >
-            <QuestionIcon className="w-4 h-4" />
+            <QuestionIcon className="w-[18px] h-[18px]" />
           </button>
+          <div
+            className="w-9 h-9 rounded-[10px] border border-rule-200 bg-paper-50 flex items-center justify-center"
+            aria-label={`${remaining} of ${level.guessBudget} guesses remaining`}
+          >
+            <span className="font-serif text-[15px] font-semibold text-ink-900 tabular-nums">
+              {remaining}
+            </span>
+            <span className="font-mono text-[9px] text-ink-400 ml-px mb-[5px] self-end">
+              /{level.guessBudget}
+            </span>
+          </div>
         </div>
       </header>
 
       {level.teachingHint && !isTerminal && <TeachingHint hint={level.teachingHint} />}
-
-      {!isTerminal && <HeroCounter marked={marked} target={level.filledCount} />}
 
       <div className="flex-1 min-h-0 flex items-center justify-center px-3 py-2">
         <div className="w-full max-w-md aspect-[500/620] mx-auto">
@@ -187,13 +190,18 @@ export function LevelGameView({
       )}
 
       {!isTerminal && game.state.guesses.length > 0 && (
-        <LastGuessSummary state={game.state} />
+        <LastGuessSummary state={game.state} budget={level.guessBudget} />
       )}
 
-      {!isTerminal && <HistoryStrip state={game.state} />}
-
       {!isTerminal && (
-        <div className="px-5 pt-3 pb-6 flex flex-col gap-2">
+        <div
+          className="px-4 pt-4 flex flex-col gap-2.5"
+          style={{
+            paddingBottom: 'max(28px, env(safe-area-inset-bottom))',
+            background:
+              'linear-gradient(to top, var(--paper-100) 70%, rgba(250,246,240,0) 100%)',
+          }}
+        >
           <SubmitButton state={game.state} onSubmit={game.submit} />
           <div className="flex justify-center">
             <HintButton state={game.state} onHintCell={game.applyHint} />
@@ -201,8 +209,7 @@ export function LevelGameView({
         </div>
       )}
 
-      {showRules && <RulesModal onDismiss={handleDismissRules} />}
+      {showRules && <RulesModal onDismiss={handleDismissRules} variant="intro" />}
     </main>
   );
 }
-
