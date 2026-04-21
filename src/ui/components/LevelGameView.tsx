@@ -161,10 +161,10 @@ export function LevelGameView({
         </div>
       </header>
 
-      {!isTerminal && (level.id === 0 || level.teachingHint) && (
+      {!isTerminal && (level.id < 7 || level.teachingHint) && (
         <TeachingHint
           hint={
-            level.id === 0
+            level.id < 7
               ? 'One row is already solved — green = filled, blank = empty. Use the sums to deduce the rest, then submit.'
               : level.teachingHint!
           }

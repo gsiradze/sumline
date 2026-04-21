@@ -39,10 +39,12 @@ function fullestRowPreLockIndices(puzzle: Puzzle): readonly number[] {
   return indices;
 }
 
+const TEACHING_BATCH_SIZE = 7;
+
 function freshState(level: BakedLevel): ActiveGameState {
   const puzzle = puzzleForLevel(level.id);
   const preLockedCells =
-    level.id === 0
+    level.id < TEACHING_BATCH_SIZE
       ? fullestRowPreLockIndices(puzzle)
       : smartPreLockIndices(puzzle, level.preLockedCellCount);
   return initialGameState({
