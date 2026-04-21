@@ -9,6 +9,8 @@ import type { ActiveGameState } from '../../game/domain/game-state';
 import { sound } from '../../game/audio/soundManager';
 import { haptics } from '../../game/audio/haptics';
 import { smartPreLockIndices } from '../../game/domain/levels';
+import { GRID_SIZE } from '../../game/domain/types';
+import type { Puzzle } from '../../game/domain/types';
 import { puzzleForLevel } from '../../storage/levelsManifest';
 import type { BakedLevel } from '../../storage/levelsManifest';
 
@@ -22,12 +24,31 @@ interface HookInit {
   readonly level: BakedLevel;
 }
 
+function fullestRowPreLockIndices(puzzle: Puzzle): readonly number[] {
+  let bestRow = 0;
+  let bestSum = -1;
+  for (let r = 0; r < GRID_SIZE; r++) {
+    const s = puzzle.rowSums[r] ?? 0;
+    if (s > bestSum) {
+      bestSum = s;
+      bestRow = r;
+    }
+  }
+  const indices: number[] = [];
+  for (let c = 0; c < GRID_SIZE; c++) indices.push(bestRow * GRID_SIZE + c);
+  return indices;
+}
+
 function freshState(level: BakedLevel): ActiveGameState {
   const puzzle = puzzleForLevel(level.id);
+  const preLockedCells =
+    level.id === 0
+      ? fullestRowPreLockIndices(puzzle)
+      : smartPreLockIndices(puzzle, level.preLockedCellCount);
   return initialGameState({
     puzzle,
     guessBudget: level.guessBudget,
-    preLockedCells: smartPreLockIndices(puzzle, level.preLockedCellCount),
+    preLockedCells,
   });
 }
 

@@ -1,4 +1,4 @@
-import { CELL_COUNT, Feedback } from '../../game/domain/types';
+import { CELL_COUNT, Feedback, GRID_SIZE } from '../../game/domain/types';
 import type { ActiveGameState } from '../../game/domain/game-state';
 
 interface LastGuessSummaryProps {
@@ -32,50 +32,58 @@ export function LastGuessSummary({ state, budget }: LastGuessSummaryProps) {
   if (!lastFb || !lastGuess) return null;
 
   const last = tallyGuess(lastGuess, lastFb);
-  const bars = state.guesses.map((g, i) => {
-    const fb = state.feedbacks[i] ?? [];
-    const { correct, wrong } = tallyGuess(g, fb);
-    const total = correct + wrong;
-    return total === 0 ? 0 : Math.round((correct / total) * 5);
-  });
-  const remaining = Math.max(0, budget - state.guesses.length);
+  const used = state.guesses.length;
+  const remaining = Math.max(0, budget - used);
 
   return (
-    <div className="mx-4 mt-5 bg-paper-50 border border-rule-200 rounded-[12px] px-3.5 py-3 flex items-center justify-between">
+    <div className="mx-4 mt-5 bg-paper-50 border border-rule-200 rounded-[12px] px-3.5 py-3 flex items-center justify-between gap-4">
       <div>
         <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">
-          Last guess
+          Last guess · {used}/{budget}
         </div>
         <div className="mt-1 font-sans text-[14px] text-ink-900">
           <span className="font-semibold text-sage-700">{last.correct} correct</span>
           <span className="text-ink-400 mx-1.5">·</span>
           <span className="font-semibold text-clay-700">{last.wrong} wrong</span>
         </div>
-      </div>
-      <div className="flex gap-1">
-        {bars.map((green, i) => (
-          <div key={`g-${i}`} className="flex flex-col gap-[2px]">
-            {Array.from({ length: 5 }).map((_, j) => (
-              <div
-                key={j}
-                className={`w-1.5 h-1.5 rounded-[1px] ${
-                  j < green ? 'bg-sage-500' : 'bg-clay-500'
-                }`}
-              />
-            ))}
+        {remaining > 0 && (
+          <div className="mt-1 font-mono text-[10px] tracking-[0.12em] uppercase text-ink-400">
+            {remaining} {remaining === 1 ? 'guess' : 'guesses'} left
           </div>
-        ))}
-        {Array.from({ length: remaining }).map((_, i) => (
-          <div key={`p-${i}`} className="flex flex-col gap-[2px]">
-            {Array.from({ length: 5 }).map((_, j) => (
-              <div
-                key={j}
-                className="w-1.5 h-1.5 rounded-[1px] bg-paper-200 border border-rule-200/60"
-              />
-            ))}
-          </div>
-        ))}
+        )}
       </div>
+      <MiniGrid guess={lastGuess} feedback={lastFb} />
+    </div>
+  );
+}
+
+function MiniGrid({
+  guess,
+  feedback,
+}: {
+  readonly guess: readonly (0 | 1)[];
+  readonly feedback: readonly Feedback[];
+}) {
+  return (
+    <div
+      className="inline-grid gap-[2px] shrink-0"
+      style={{
+        gridTemplateColumns: `repeat(${GRID_SIZE}, 10px)`,
+        gridTemplateRows: `repeat(${GRID_SIZE}, 10px)`,
+      }}
+      aria-hidden="true"
+    >
+      {Array.from({ length: CELL_COUNT }).map((_, i) => {
+        const marked = guess[i] === 1;
+        const correct = marked && feedback[i] === Feedback.Green;
+        const wrong = marked && feedback[i] === Feedback.Red;
+        const cls = correct
+          ? 'bg-sage-500'
+          : wrong
+            ? 'bg-clay-500'
+            : 'bg-paper-200 border border-rule-200/70';
+        return <div key={i} className={`w-[10px] h-[10px] rounded-[2px] ${cls}`} />;
+      })}
     </div>
   );
 }

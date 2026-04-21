@@ -42,13 +42,13 @@ export const hex = {
 
 export const layout = {
   canvasWidth: 500,
-  canvasHeight: 620,
+  canvasHeight: 520,
   cellSize: 58,
   cellGap: 8,
   cellRadius: 6,
   clueGutter: 38,
   clueFontSize: 22,
-  gridOriginY: 120,
+  gridOriginY: 56,
 } as const;
 
 export const motion = {

@@ -14,14 +14,27 @@ export function SubmitButton({ state, onSubmit }: SubmitButtonProps) {
   const atCap = marked >= cap;
   const label = next === 1 ? 'Submit guess' : `Guess ${next} of ${state.guessBudget}`;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2.5">
       <div
-        className={`font-mono text-[10px] tracking-[0.14em] uppercase text-center tabular-nums ${
-          atCap ? 'text-sage-700' : 'text-ink-500'
-        }`}
+        className="flex items-center justify-center gap-2 text-center"
         aria-live="polite"
       >
-        {marked} of {cap} marked
+        <span
+          className={`font-serif text-[20px] font-semibold leading-none tabular-nums ${
+            atCap ? 'text-sage-700' : 'text-ink-900'
+          }`}
+        >
+          {marked}
+        </span>
+        <span className="font-mono text-[11px] tracking-[0.12em] uppercase text-ink-500">
+          of
+        </span>
+        <span className="font-serif text-[20px] font-semibold leading-none tabular-nums text-ink-900">
+          {cap}
+        </span>
+        <span className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">
+          marked
+        </span>
       </div>
       <button
         type="button"

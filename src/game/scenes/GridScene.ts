@@ -5,7 +5,13 @@ import { colors, hex, layout, motion } from '../rendering/tokens';
 import { CELL_COUNT, Feedback, GRID_SIZE, GameOutcome } from '../domain/types';
 import type { ActiveGameState } from '../domain/game-state';
 
-type CellVisualState = 'empty' | 'marked' | 'marked-wrong' | 'locked-filled' | 'locked-empty';
+type CellVisualState =
+  | 'empty'
+  | 'marked'
+  | 'marked-wrong'
+  | 'locked-filled'
+  | 'locked-empty'
+  | 'locked-wrong';
 
 export class GridScene extends Scene {
   private state: ActiveGameState | null = null;
@@ -16,6 +22,7 @@ export class GridScene extends Scene {
   private originX = 0;
   private originY = 0;
   private destroyed = false;
+  private wrongHistory: Set<number> = new Set();
 
   constructor() {
     super('Grid');
@@ -97,9 +104,12 @@ export class GridScene extends Scene {
       prev?.outcome !== GameOutcome.Lost && state.outcome === GameOutcome.Lost;
     const becameWon =
       prev?.outcome !== GameOutcome.Won && state.outcome === GameOutcome.Won;
+    const submitHappened =
+      !!prev && state.feedbacks.length > prev.feedbacks.length;
     this.state = state;
 
     if (isNewPuzzle) {
+      this.wrongHistory.clear();
       for (let r = 0; r < GRID_SIZE; r++) {
         const t = this.rowTexts[r];
         if (t && t.scene) t.setText(String(state.puzzle.rowSums[r] ?? ''));
@@ -107,6 +117,18 @@ export class GridScene extends Scene {
       for (let c = 0; c < GRID_SIZE; c++) {
         const t = this.colTexts[c];
         if (t && t.scene) t.setText(String(state.puzzle.colSums[c] ?? ''));
+      }
+    }
+
+    if (submitHappened) {
+      const latestFb = state.feedbacks[state.feedbacks.length - 1];
+      const latestGuess = state.guesses[state.guesses.length - 1];
+      if (latestFb && latestGuess) {
+        for (let i = 0; i < CELL_COUNT; i++) {
+          if (latestGuess[i] === 1 && latestFb[i] === Feedback.Red) {
+            this.wrongHistory.add(i);
+          }
+        }
       }
     }
 
@@ -118,8 +140,48 @@ export class GridScene extends Scene {
       this.playWinShimmer();
       return;
     }
+    if (submitHappened && this.playWrongFlash()) return;
     this.redrawAllCells();
   };
+
+  private playWrongFlash(): boolean {
+    if (!this.state) return false;
+    const fb = this.state.feedbacks[this.state.feedbacks.length - 1];
+    const guess = this.state.guesses[this.state.guesses.length - 1];
+    if (!fb || !guess) return false;
+    const wrong = new Set<number>();
+    for (let i = 0; i < CELL_COUNT; i++) {
+      if (guess[i] === 1 && fb[i] === Feedback.Red) wrong.add(i);
+    }
+    if (wrong.size === 0) return false;
+
+    for (let i = 0; i < CELL_COUNT; i++) {
+      const g = this.cellGfx[i];
+      if (!g) continue;
+      if (wrong.has(i)) this.drawCell(g, 'marked-wrong');
+      else this.drawCell(g, this.visualStateFor(i));
+    }
+
+    for (const i of wrong) {
+      const g = this.cellGfx[i];
+      if (!g) continue;
+      this.tweens.killTweensOf(g);
+      g.setScale(1);
+      this.tweens.add({
+        targets: g,
+        scale: { from: 1, to: 1.05 },
+        duration: 110,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+      });
+    }
+
+    this.time.delayedCall(520, () => {
+      if (this.destroyed) return;
+      this.redrawAllCells();
+    });
+    return true;
+  }
 
   private playLoseReveal(): void {
     for (let i = 0; i < CELL_COUNT; i++) {
@@ -198,7 +260,9 @@ export class GridScene extends Scene {
       return this.state.puzzle.solution[i] === 1 ? 'locked-filled' : 'locked-empty';
     }
     if (this.state.lockedFilled[i]) return 'locked-filled';
-    if (this.state.lockedEmpty[i]) return 'locked-empty';
+    if (this.state.lockedEmpty[i]) {
+      return this.wrongHistory.has(i) ? 'locked-wrong' : 'locked-empty';
+    }
     if (this.state.currentMarks[i] === 1) {
       const feedbacks = this.state.feedbacks;
       const guesses = this.state.guesses;
@@ -237,7 +301,7 @@ export class GridScene extends Scene {
         g.fillStyle(0xffffff, 0.04);
         g.fillRoundedRect(0, size - 3, size, 3, radius);
         break;
-      case 'marked-wrong':
+      case 'marked-wrong': {
         g.fillStyle(colors.clay500, 1);
         g.fillRoundedRect(0, 0, size, size, radius);
         g.lineStyle(1.5, colors.clay700, 0.9);
@@ -246,7 +310,17 @@ export class GridScene extends Scene {
         g.fillRoundedRect(0, 0, size, 4, radius);
         g.fillStyle(0xffffff, 0.06);
         g.fillRoundedRect(0, size - 3, size, 3, radius);
+        const mid = size / 2;
+        const armLen = size * 0.22;
+        g.lineStyle(2.75, colors.paper50, 0.95);
+        g.beginPath();
+        g.moveTo(mid - armLen, mid - armLen);
+        g.lineTo(mid + armLen, mid + armLen);
+        g.moveTo(mid + armLen, mid - armLen);
+        g.lineTo(mid - armLen, mid + armLen);
+        g.strokePath();
         break;
+      }
       case 'locked-filled':
         g.fillStyle(colors.sage500, 1);
         g.fillRoundedRect(0, 0, size, size, radius);
@@ -255,6 +329,22 @@ export class GridScene extends Scene {
         g.fillStyle(colors.sage700, 0.55);
         g.fillCircle(size - 12, 12, 5);
         break;
+      case 'locked-wrong': {
+        g.fillStyle(colors.clay100, 1);
+        g.fillRoundedRect(0, 0, size, size, radius);
+        g.lineStyle(1, colors.clay300, 1);
+        g.strokeRoundedRect(0.5, 0.5, size - 1, size - 1, radius);
+        const mid = size / 2;
+        const armLen = size * 0.2;
+        g.lineStyle(2.25, colors.clay700, 0.75);
+        g.beginPath();
+        g.moveTo(mid - armLen, mid - armLen);
+        g.lineTo(mid + armLen, mid + armLen);
+        g.moveTo(mid + armLen, mid - armLen);
+        g.lineTo(mid - armLen, mid + armLen);
+        g.strokePath();
+        break;
+      }
       case 'locked-empty': {
         g.fillStyle(colors.sage100, 1);
         g.fillRoundedRect(0, 0, size, size, radius);

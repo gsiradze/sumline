@@ -119,50 +119,60 @@ export function LevelGameView({
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      <header className="px-4 pt-[18px] pb-2.5 flex items-start justify-between">
+      <header className="px-4 pt-8 pb-3 flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to levels"
-          className="w-9 h-9 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+          className="w-10 h-10 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge shrink-0"
         >
           <ArrowLeftIcon className="w-[18px] h-[18px]" />
         </button>
-        <div className="flex-1 text-center mt-0.5">
-          <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">
-            {tierLabel} · Set {setNumber} · {withinSet} / 7
+        <div className="flex-1 text-center min-w-0">
+          <div className="font-mono text-[10px] tracking-[0.12em] uppercase text-ink-500 whitespace-nowrap">
+            {tierLabel} · {setNumber}.{withinSet}
           </div>
           <h1 className="font-serif text-[22px] font-medium leading-[1.15] tracking-[-0.01em] text-ink-900 mt-0.5">
             Level {level.id + 1}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setShowRules(true)}
             aria-label="Show rules"
-            className="w-9 h-9 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+            className="w-10 h-10 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
           >
             <QuestionIcon className="w-[18px] h-[18px]" />
           </button>
           <div
-            className="w-9 h-9 rounded-[10px] border border-rule-200 bg-paper-50 flex items-center justify-center"
+            className="h-10 min-w-[52px] px-2.5 rounded-[10px] border border-rule-200 bg-paper-50 flex items-center justify-center"
             aria-label={`${remaining} of ${level.guessBudget} guesses remaining`}
           >
-            <span className="font-serif text-[15px] font-semibold text-ink-900 tabular-nums">
-              {remaining}
-            </span>
-            <span className="font-mono text-[9px] text-ink-400 ml-px mb-[5px] self-end">
-              /{level.guessBudget}
+            <span className="inline-flex items-baseline gap-[2px] leading-none">
+              <span className="font-serif text-[22px] font-semibold text-ink-900 tabular-nums">
+                {remaining}
+              </span>
+              <span className="font-mono text-[12px] text-ink-500 tabular-nums">
+                /{level.guessBudget}
+              </span>
             </span>
           </div>
         </div>
       </header>
 
-      {level.teachingHint && !isTerminal && <TeachingHint hint={level.teachingHint} />}
+      {!isTerminal && (level.id === 0 || level.teachingHint) && (
+        <TeachingHint
+          hint={
+            level.id === 0
+              ? 'One row is already solved — green = filled, blank = empty. Use the sums to deduce the rest, then submit.'
+              : level.teachingHint!
+          }
+        />
+      )}
 
-      <div className="flex-1 min-h-0 flex items-center justify-center px-3 py-2">
-        <div className="w-full max-w-md aspect-[500/620] mx-auto">
+      <div className="flex justify-center px-3">
+        <div className="w-full max-w-md aspect-[500/520] mx-auto">
           <PhaserGame
             state={game.state}
             onCellTapped={game.onCellTapped}
