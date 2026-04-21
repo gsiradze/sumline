@@ -4,6 +4,7 @@ import { useGameState } from '../hooks/useGameState';
 import { useAudioFx } from '../hooks/useAudioFx';
 import { useRetry } from '../hooks/useRetry';
 import { SubmitButton } from './SubmitButton';
+import { BeaverOverlay } from './BeaverOverlay';
 import { LastGuessSummary } from './LastGuessSummary';
 import { RulesModal } from './RulesModal';
 import { HintButton } from './HintButton';
@@ -172,12 +173,13 @@ export function LevelGameView({
       )}
 
       <div className="flex justify-center px-3">
-        <div className="w-full max-w-md aspect-[500/520] mx-auto">
+        <div className="relative w-full max-w-md aspect-[500/520] mx-auto">
           <PhaserGame
             state={game.state}
             onCellTapped={game.onCellTapped}
             inputDisabled={showRules}
           />
+          <BeaverOverlay state={game.state} levelId={level.id} />
         </div>
       </div>
 
