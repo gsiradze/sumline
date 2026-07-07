@@ -10,7 +10,7 @@ import type { LevelProgressMap } from '../../game/domain/levels';
 import { TOTAL_LEVELS, levelsInTier } from '../../game/domain/tiers';
 import { Tier } from '../../game/domain/types';
 import type { Stats } from '../../game/domain/stats';
-import { FlameIcon, SpeakerOffIcon, SpeakerOnIcon } from './icons';
+import { FlameIcon, GearIcon, SpeakerOffIcon, SpeakerOnIcon } from './icons';
 
 interface HomeScreenProps {
   readonly progress: LevelProgressMap;
@@ -20,6 +20,7 @@ interface HomeScreenProps {
   readonly onPickTier: (tier: Tier) => void;
   readonly onPickLevel: (levelId: number) => void;
   readonly onOpenStats: () => void;
+  readonly onOpenSettings: () => void;
 }
 
 function firstIncompleteLevelId(progress: LevelProgressMap): number {
@@ -47,6 +48,7 @@ export function HomeScreen({
   onPickTier,
   onPickLevel,
   onOpenStats,
+  onOpenSettings,
 }: HomeScreenProps) {
   const [entering, setEntering] = useState(true);
   useEffect(() => {
@@ -67,7 +69,7 @@ export function HomeScreen({
 
   return (
     <main
-      className="min-h-screen flex flex-col font-sans text-ink-900 select-none overflow-x-hidden"
+      className="screen-min-h flex flex-col font-sans text-ink-900 select-none overflow-x-hidden"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
@@ -79,7 +81,12 @@ export function HomeScreen({
       }}
     >
       <div className="relative w-full max-w-[390px] mx-auto flex flex-col flex-1">
-        <TopBar muted={muted} onToggleMute={onToggleMute} onOpenStats={onOpenStats} />
+        <TopBar
+          muted={muted}
+          onToggleMute={onToggleMute}
+          onOpenStats={onOpenStats}
+          onOpenSettings={onOpenSettings}
+        />
         <HomeWordmark entering={entering} />
         <HomeStage
           entering={entering}
@@ -107,26 +114,38 @@ function TopBar({
   muted,
   onToggleMute,
   onOpenStats,
+  onOpenSettings,
 }: {
   readonly muted: boolean;
   readonly onToggleMute: () => void;
   readonly onOpenStats: () => void;
+  readonly onOpenSettings: () => void;
 }) {
   return (
     <div className="px-4 pt-5 flex items-center justify-between z-10">
-      <button
-        type="button"
-        onClick={onToggleMute}
-        aria-label={muted ? 'Unmute sound' : 'Mute sound'}
-        className="relative w-9 h-9 rounded-full bg-paper-50/70 backdrop-blur border border-rule-200 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
-      >
-        <span aria-hidden="true" className="absolute -inset-2.5" />
-        {muted ? (
-          <SpeakerOffIcon className="w-[16px] h-[16px]" />
-        ) : (
-          <SpeakerOnIcon className="w-[16px] h-[16px]" />
-        )}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleMute}
+          aria-label={muted ? 'Unmute sound' : 'Mute sound'}
+          className="relative w-9 h-9 rounded-full bg-paper-50/70 backdrop-blur border border-rule-200 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+        >
+          <span aria-hidden="true" className="absolute -inset-2.5" />
+          {muted ? (
+            <SpeakerOffIcon className="w-[16px] h-[16px]" />
+          ) : (
+            <SpeakerOnIcon className="w-[16px] h-[16px]" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          className="w-9 h-9 rounded-full bg-paper-50/70 backdrop-blur border border-rule-200 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+        >
+          <GearIcon className="w-[16px] h-[16px]" />
+        </button>
+      </div>
       <button
         type="button"
         onClick={onOpenStats}

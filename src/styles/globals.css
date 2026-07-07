@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .screen-min-h {
+    min-height: calc(100vh - var(--banner-height, 0px));
+  }
+}
+
 @layer base {
   :root {
     --paper-50: #fdfbf6;
@@ -44,6 +50,8 @@
     --sh-2: 0 2px 6px rgba(60, 42, 20, 0.07), 0 1px 2px rgba(60, 42, 20, 0.05);
     --sh-3: 0 6px 18px rgba(60, 42, 20, 0.09), 0 2px 4px rgba(60, 42, 20, 0.05);
     --sh-ink: inset 0 1px 2px rgba(20, 24, 40, 0.35), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+
+    --banner-height: 0px;
   }
 
   .dark {

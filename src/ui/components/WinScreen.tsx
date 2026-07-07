@@ -3,6 +3,8 @@ import { generateShareText } from '../../game/domain/shareGrid';
 import { CELL_COUNT, Feedback } from '../../game/domain/types';
 import type { ActiveGameState } from '../../game/domain/game-state';
 import type { Stars } from '../../game/domain/stars';
+import { shareOrCopy } from '../../platform/share';
+import { shareResult } from '../../telemetry/events';
 import { ShareIcon, StarIcon } from './icons';
 
 interface WinScreenProps {
@@ -62,23 +64,11 @@ export function WinScreen({ state, levelId, stars, onNext, onBack }: WinScreenPr
   }, [onNext, cancelled]);
 
   const handleShare = useCallback(async () => {
-    const nav = typeof navigator !== 'undefined' ? navigator : null;
-    if (nav && typeof nav.share === 'function') {
-      try {
-        await nav.share({ text: shareText, title: `Sumline L${levelId}` });
-        return;
-      } catch {
-        // fall through
-      }
-    }
-    if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
-      try {
-        await nav.clipboard.writeText(shareText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      } catch {
-        // swallow
-      }
+    const outcome = await shareOrCopy({ text: shareText, title: `Sumline L${levelId}` });
+    shareResult('level', outcome);
+    if (outcome === 'copied') {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     }
   }, [shareText, levelId]);
 
@@ -145,8 +135,9 @@ export function WinScreen({ state, levelId, stars, onNext, onBack }: WinScreenPr
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-40 px-4 pt-6"
+        className="fixed inset-x-0 z-40 px-4 pt-6"
         style={{
+          bottom: 'var(--banner-height, 0px)',
           paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
           background:
             'linear-gradient(to top, var(--paper-100) 55%, rgba(250,246,240,0.95) 80%, rgba(250,246,240,0) 100%)',

@@ -27,3 +27,13 @@ coverage
 
 # TS incremental build
 *.tsbuildinfo
+
+# Native projects — regenerated per-machine via `npx cap add`; native tweaks
+# are re-applied idempotently by `npm run patch:native`.
+/ios
+/android
+
+# Env (real ad-unit IDs / keys); .env.example is committed
+.env
+.env.*
+!.env.example

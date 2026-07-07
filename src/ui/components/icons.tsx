@@ -38,6 +38,24 @@ export function ShareIcon({ className }: IconProps) {
   );
 }
 
+export function GearIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2.5v2.6M12 18.9v2.6M4.4 4.4l1.9 1.9M17.7 17.7l1.9 1.9M2.5 12h2.6M18.9 12h2.6M4.4 19.6l1.9-1.9M17.7 6.3l1.9-1.9" />
+    </svg>
+  );
+}
+
 export function SpeakerOnIcon({ className }: IconProps) {
   return (
     <svg

@@ -1,15 +1,30 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadProgress, saveProgress } from '../../storage/persistence';
+import { emptyProgress } from '../../game/domain/levels';
 import type { LevelProgressMap, LevelProgressRecord } from '../../game/domain/levels';
 import type { Stars } from '../../game/domain/stars';
 
 export interface UseProgress {
   readonly progress: LevelProgressMap;
+  readonly hydrated: boolean;
   readonly recordLevelWin: (levelId: number, guessCount: number, stars: Stars) => void;
 }
 
 export function useProgress(): UseProgress {
-  const [progress, setProgress] = useState<LevelProgressMap>(() => loadProgress());
+  const [progress, setProgress] = useState<LevelProgressMap>(emptyProgress);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadProgress().then(loaded => {
+      if (cancelled) return;
+      setProgress(loaded);
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const recordLevelWin = useCallback(
     (levelId: number, guessCount: number, stars: Stars) => {
@@ -26,12 +41,12 @@ export function useProgress(): UseProgress {
           bestGuessCount,
           stars: bestStars,
         };
-        saveProgress(next);
+        void saveProgress(next);
         return next;
       });
     },
     [],
   );
 
-  return { progress, recordLevelWin };
+  return { progress, hydrated, recordLevelWin };
 }

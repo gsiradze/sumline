@@ -7,6 +7,8 @@ import {
 } from '../../storage/persistence';
 import type { RetryState } from '../../storage/persistence';
 import { adProvider } from '../../storage/ads';
+import { noteAdShown } from '../../storage/adSession';
+import { adImpression } from '../../telemetry/events';
 
 const AD_RETRY_GRANT = 2;
 
@@ -21,16 +23,22 @@ export interface UseRetry {
 }
 
 export function useRetry(levelId: number): UseRetry {
-  const [retry, setRetry] = useState<RetryState>(() => loadRetryState(levelId));
+  const [retry, setRetry] = useState<RetryState>(defaultRetryState);
 
   useEffect(() => {
-    setRetry(loadRetryState(levelId));
+    let cancelled = false;
+    void loadRetryState(levelId).then(loaded => {
+      if (!cancelled) setRetry(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [levelId]);
 
   const persist = useCallback(
     (next: RetryState) => {
       setRetry(next);
-      saveRetryState(levelId, next);
+      void saveRetryState(levelId, next);
     },
     [levelId],
   );
@@ -39,7 +47,7 @@ export function useRetry(levelId: number): UseRetry {
     setRetry(prev => {
       if (prev.freeRetryUsed) return prev;
       const next = { ...prev, freeRetryUsed: true };
-      saveRetryState(levelId, next);
+      void saveRetryState(levelId, next);
       return next;
     });
   }, [levelId]);
@@ -48,27 +56,29 @@ export function useRetry(levelId: number): UseRetry {
     setRetry(prev => {
       if (prev.adRetriesRemaining <= 0) return prev;
       const next = { ...prev, adRetriesRemaining: prev.adRetriesRemaining - 1 };
-      saveRetryState(levelId, next);
+      void saveRetryState(levelId, next);
       return next;
     });
   }, [levelId]);
 
   const requestAdRetries = useCallback(async () => {
     const outcome = await adProvider.showRewardedAd('retry');
+    adImpression('retry', outcome);
     if (outcome !== 'granted') return false;
+    noteAdShown(Date.now());
     setRetry(prev => {
       const next = {
         ...prev,
         adRetriesRemaining: prev.adRetriesRemaining + AD_RETRY_GRANT,
       };
-      saveRetryState(levelId, next);
+      void saveRetryState(levelId, next);
       return next;
     });
     return true;
   }, [levelId]);
 
   const reset = useCallback(() => {
-    clearRetryState(levelId);
+    void clearRetryState(levelId);
     persist(defaultRetryState());
   }, [levelId, persist]);
 

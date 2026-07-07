@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { adProvider } from '../../storage/ads';
+import { noteAdShown } from '../../storage/adSession';
+import { adImpression, hintUsed } from '../../telemetry/events';
 import { LightbulbIcon } from './icons';
 import { findHintCell } from '../../game/domain/hint';
 import type { ActiveGameState } from '../../game/domain/game-state';
 
 interface HintButtonProps {
   readonly state: ActiveGameState;
+  readonly levelId: number;
   readonly onHintCell: (cellIndex: number) => void;
   readonly disabled?: boolean;
 }
 
-export function HintButton({ state, onHintCell, disabled }: HintButtonProps) {
+export function HintButton({ state, levelId, onHintCell, disabled }: HintButtonProps) {
   const [pending, setPending] = useState(false);
 
   const handleClick = async (): Promise<void> => {
@@ -18,9 +21,12 @@ export function HintButton({ state, onHintCell, disabled }: HintButtonProps) {
     setPending(true);
     try {
       const outcome = await adProvider.showRewardedAd('hint');
+      adImpression('hint', outcome);
       if (outcome !== 'granted') return;
+      noteAdShown(Date.now());
       const cell = findHintCell(state);
       if (cell === null) return;
+      hintUsed(levelId);
       onHintCell(cell);
     } finally {
       setPending(false);

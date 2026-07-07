@@ -37,7 +37,7 @@ export function TierView({ tier, progress, onBack, onPickLevel }: TierViewProps)
   }, [config.batches, progress, tier]);
 
   return (
-    <main className="min-h-screen flex flex-col font-sans text-ink-900 bg-paper-100">
+    <main className="screen-min-h flex flex-col font-sans text-ink-900 bg-paper-100">
       <header className="px-5 pt-6 pb-4 border-b border-rule-200">
         <button
           type="button"

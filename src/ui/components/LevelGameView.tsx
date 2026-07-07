@@ -12,7 +12,11 @@ import { TeachingHint } from './TeachingHint';
 import { WinScreen } from './WinScreen';
 import { RetryGate } from './RetryGate';
 import { ArrowLeftIcon, QuestionIcon } from './icons';
+import { useKeepAwake } from '../hooks/useKeepAwake';
 import { getRulesShown, setRulesShown } from '../../storage/persistence';
+import { levelComplete, levelFail, levelQuit, levelStart } from '../../telemetry/events';
+import { maybeRequestReview } from '../../platform/review';
+import { currentSessionCount } from '../../storage/adSession';
 import { GameOutcome } from '../../game/domain/types';
 import { guessesRemaining } from '../../game/domain/game-state';
 import { starsForWin } from '../../game/domain/stars';
@@ -46,13 +50,30 @@ export function LevelGameView({
 }: LevelGameViewProps) {
   const game = useGameState(level);
   useAudioFx(game.state);
+  useKeepAwake();
   const retry = useRetry(level.id);
   const recordedRef = useRef(false);
+  const mountedAtRef = useRef(Date.now());
   const progressRef = useRef(progress);
   progressRef.current = progress;
   const gameStateRef = useRef(game.state);
   gameStateRef.current = game.state;
-  const [showRules, setShowRules] = useState(() => !getRulesShown());
+  const [showRules, setShowRules] = useState(false);
+
+  useEffect(() => {
+    mountedAtRef.current = Date.now();
+    levelStart(level.id);
+  }, [level.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getRulesShown().then(shown => {
+      if (!cancelled && !shown) setShowRules(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(
     () =>
@@ -67,11 +88,12 @@ export function LevelGameView({
 
   const handleDismissRules = useCallback(() => {
     setShowRules(false);
-    setRulesShown(true);
+    void setRulesShown(true);
   }, []);
 
   useEffect(() => {
     if (recordedRef.current) return;
+    const durationS = Math.round((Date.now() - mountedAtRef.current) / 1000);
     if (game.state.outcome === GameOutcome.Won) {
       const used = game.state.guesses.length;
       const stars = starsForWin(level.tier, used);
@@ -79,10 +101,12 @@ export function LevelGameView({
       const firstCompletion = !existing.completed;
       onRecordWin(level.id, used, stars);
       onRecordStatsWin({ guessCount: used, stars, firstCompletion });
+      levelComplete(level.id, used, stars, durationS);
       retry.reset();
       recordedRef.current = true;
     } else if (game.state.outcome === GameOutcome.Lost) {
       onRecordStatsLoss();
+      levelFail(level.id, game.state.guesses.length, durationS);
       recordedRef.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,9 +123,21 @@ export function LevelGameView({
 
   const nextLevelId = level.id + 1 < TOTAL_LEVELS ? level.id + 1 : null;
   const onNext = useCallback(() => {
+    const st = gameStateRef.current;
+    if (st.outcome === GameOutcome.Won && starsForWin(level.tier, st.guesses.length) === 3) {
+      void maybeRequestReview({ stars: 3, level: level.id, sessionCount: currentSessionCount() });
+    }
     if (nextLevelId !== null) onGotoLevel(nextLevelId);
     else onBack();
-  }, [nextLevelId, onBack, onGotoLevel]);
+  }, [nextLevelId, onBack, onGotoLevel, level.tier, level.id]);
+
+  const handleHeaderBack = useCallback(() => {
+    const st = gameStateRef.current;
+    if (st.outcome === GameOutcome.InProgress) {
+      levelQuit(level.id, st.guesses.length, Math.round((Date.now() - mountedAtRef.current) / 1000));
+    }
+    onBack();
+  }, [onBack, level.id]);
 
   const tierLabel = config.label;
   const { indexInBatch, batchIndexInTier } = coordsForLevelId(level.id);
@@ -115,7 +151,7 @@ export function LevelGameView({
 
   return (
     <main
-      className="min-h-screen flex flex-col font-sans text-ink-900 bg-paper-100 select-none"
+      className="screen-min-h flex flex-col font-sans text-ink-900 bg-paper-100 select-none"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
       }}
@@ -123,7 +159,7 @@ export function LevelGameView({
       <header className="px-4 pt-8 pb-3 flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={onBack}
+          onClick={handleHeaderBack}
           aria-label="Back to levels"
           className="w-10 h-10 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge shrink-0"
         >
@@ -216,7 +252,7 @@ export function LevelGameView({
         >
           <SubmitButton state={game.state} onSubmit={game.submit} />
           <div className="flex justify-center">
-            <HintButton state={game.state} onHintCell={game.applyHint} />
+            <HintButton state={game.state} levelId={level.id} onHintCell={game.applyHint} />
           </div>
         </div>
       )}

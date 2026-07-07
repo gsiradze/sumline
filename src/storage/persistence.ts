@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import { emptyStats } from '../game/domain/stats';
 import type { Stats } from '../game/domain/stats';
 import { emptyProgress } from '../game/domain/levels';
@@ -5,20 +7,30 @@ import type { LevelProgressMap, LevelProgressRecord } from '../game/domain/level
 
 const K_STATS = 'grid:v2:stats';
 const K_PROGRESS = 'grid:v2:progress';
-const K_RETRY = (levelId: number) => `grid:v2:retry:${levelId}`;
-const K_TUTORIAL = 'grid:v2:tutorialShown';
+const K_RETRY = (levelId: number): string => `grid:v2:retry:${levelId}`;
 const K_RULES = 'grid:v2:rulesShown';
 const K_MUTED = 'grid:v2:muted';
+const K_NOTIFICATIONS = 'grid:v2:notifications';
+const K_SESSION = 'grid:v2:sessionCount';
 
-const LEGACY_KEYS = [
-  'grid:v1:stats',
-  'grid:v1:tutorialShown',
-  'grid:v1:muted',
-] as const;
+const SESSION_BOOT_FLAG = 'grid:session-advanced';
+
+const LEGACY_KEYS = ['grid:v1:stats', 'grid:v1:tutorialShown', 'grid:v1:muted', 'grid:v2:tutorialShown'] as const;
 const LEGACY_DAILY_PREFIX = 'grid:v1:daily:';
 
-function safeGet(key: string): string | null {
+const MIGRATION_FLAG = 'grid:migrated-to-prefs';
+const MIGRATE_PREFIXES = ['grid:v2:', 'settings:', 'consent:', 'review:'];
+
+function isNative(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+export async function safeGet(key: string): Promise<string | null> {
   try {
+    if (isNative()) {
+      const { value } = await Preferences.get({ key });
+      return value ?? null;
+    }
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem(key);
   } catch {
@@ -26,8 +38,12 @@ function safeGet(key: string): string | null {
   }
 }
 
-function safeSet(key: string, value: string): void {
+export async function safeSet(key: string, value: string): Promise<void> {
   try {
+    if (isNative()) {
+      await Preferences.set({ key, value });
+      return;
+    }
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(key, value);
   } catch {
@@ -35,8 +51,12 @@ function safeSet(key: string, value: string): void {
   }
 }
 
-function safeRemove(key: string): void {
+export async function safeRemove(key: string): Promise<void> {
   try {
+    if (isNative()) {
+      await Preferences.remove({ key });
+      return;
+    }
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem(key);
   } catch {
@@ -44,8 +64,73 @@ function safeRemove(key: string): void {
   }
 }
 
-export function loadStats(): Stats {
-  const raw = safeGet(K_STATS);
+export async function saveJson(key: string, value: unknown): Promise<void> {
+  try {
+    await safeSet(key, JSON.stringify(value));
+  } catch {
+    // swallow
+  }
+}
+
+export async function loadJson<T>(key: string, fallback: T): Promise<T> {
+  const raw = await safeGet(key);
+  if (raw === null) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function resetAllWithPrefix(prefix: string): Promise<void> {
+  try {
+    if (isNative()) {
+      const { keys } = await Preferences.keys();
+      await Promise.all(
+        keys.filter(k => k.startsWith(prefix)).map(k => Preferences.remove({ key: k })),
+      );
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    const toRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith(prefix)) toRemove.push(k);
+    }
+    for (const k of toRemove) window.localStorage.removeItem(k);
+  } catch {
+    // swallow
+  }
+}
+
+let migrationPromise: Promise<void> | null = null;
+
+export function ensureMigrated(): Promise<void> {
+  if (!migrationPromise) migrationPromise = runMigration();
+  return migrationPromise;
+}
+
+async function runMigration(): Promise<void> {
+  if (!isNative()) return;
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const { value: done } = await Preferences.get({ key: MIGRATION_FLAG });
+    if (done) return;
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (!k || !MIGRATE_PREFIXES.some(p => k.startsWith(p))) continue;
+      const v = window.localStorage.getItem(k);
+      if (v !== null) await Preferences.set({ key: k, value: v });
+    }
+    await Preferences.set({ key: MIGRATION_FLAG, value: '1' });
+  } catch {
+    // non-fatal: fall back to reading fresh state
+  }
+}
+
+export async function loadStats(): Promise<Stats> {
+  await ensureMigrated();
+  const raw = await safeGet(K_STATS);
   if (!raw) return emptyStats();
   try {
     const parsed = JSON.parse(raw) as Partial<Stats>;
@@ -61,12 +146,13 @@ export function loadStats(): Stats {
   }
 }
 
-export function saveStats(stats: Stats): void {
-  safeSet(K_STATS, JSON.stringify(stats));
+export async function saveStats(stats: Stats): Promise<void> {
+  await safeSet(K_STATS, JSON.stringify(stats));
 }
 
-export function loadProgress(): LevelProgressMap {
-  const raw = safeGet(K_PROGRESS);
+export async function loadProgress(): Promise<LevelProgressMap> {
+  await ensureMigrated();
+  const raw = await safeGet(K_PROGRESS);
   if (!raw) return emptyProgress();
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -90,8 +176,8 @@ export function loadProgress(): LevelProgressMap {
   }
 }
 
-export function saveProgress(progress: LevelProgressMap): void {
-  safeSet(K_PROGRESS, JSON.stringify(progress));
+export async function saveProgress(progress: LevelProgressMap): Promise<void> {
+  await safeSet(K_PROGRESS, JSON.stringify(progress));
 }
 
 export interface RetryState {
@@ -103,8 +189,9 @@ export function defaultRetryState(): RetryState {
   return { freeRetryUsed: false, adRetriesRemaining: 0 };
 }
 
-export function loadRetryState(levelId: number): RetryState {
-  const raw = safeGet(K_RETRY(levelId));
+export async function loadRetryState(levelId: number): Promise<RetryState> {
+  await ensureMigrated();
+  const raw = await safeGet(K_RETRY(levelId));
   if (!raw) return defaultRetryState();
   try {
     const parsed = JSON.parse(raw) as Partial<RetryState>;
@@ -120,51 +207,75 @@ export function loadRetryState(levelId: number): RetryState {
   }
 }
 
-export function saveRetryState(levelId: number, state: RetryState): void {
-  safeSet(K_RETRY(levelId), JSON.stringify(state));
+export async function saveRetryState(levelId: number, state: RetryState): Promise<void> {
+  await safeSet(K_RETRY(levelId), JSON.stringify(state));
 }
 
-export function clearRetryState(levelId: number): void {
-  safeRemove(K_RETRY(levelId));
+export async function clearRetryState(levelId: number): Promise<void> {
+  await safeRemove(K_RETRY(levelId));
 }
 
-export function getTutorialShown(): boolean {
-  return safeGet(K_TUTORIAL) === '1';
+export async function getRulesShown(): Promise<boolean> {
+  await ensureMigrated();
+  return (await safeGet(K_RULES)) === '1';
 }
 
-export function setTutorialShown(shown: boolean): void {
-  if (shown) safeSet(K_TUTORIAL, '1');
-  else safeRemove(K_TUTORIAL);
+export async function setRulesShown(shown: boolean): Promise<void> {
+  if (shown) await safeSet(K_RULES, '1');
+  else await safeRemove(K_RULES);
 }
 
-export function getRulesShown(): boolean {
-  return safeGet(K_RULES) === '1';
+export async function getMuted(): Promise<boolean> {
+  await ensureMigrated();
+  return (await safeGet(K_MUTED)) === '1';
 }
 
-export function setRulesShown(shown: boolean): void {
-  if (shown) safeSet(K_RULES, '1');
-  else safeRemove(K_RULES);
+export async function setMuted(muted: boolean): Promise<void> {
+  if (muted) await safeSet(K_MUTED, '1');
+  else await safeRemove(K_MUTED);
 }
 
-export function getMuted(): boolean {
-  return safeGet(K_MUTED) === '1';
+export async function getNotificationsEnabled(): Promise<boolean> {
+  await ensureMigrated();
+  return (await safeGet(K_NOTIFICATIONS)) === '1';
 }
 
-export function setMuted(muted: boolean): void {
-  if (muted) safeSet(K_MUTED, '1');
-  else safeRemove(K_MUTED);
+export async function setNotificationsEnabled(enabled: boolean): Promise<void> {
+  if (enabled) await safeSet(K_NOTIFICATIONS, '1');
+  else await safeRemove(K_NOTIFICATIONS);
 }
 
-export function purgeLegacyKeys(): void {
+export async function getSessionCount(): Promise<number> {
+  const raw = await safeGet(K_SESSION);
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+export async function advanceSessionOncePerBoot(): Promise<number> {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      if (sessionStorage.getItem(SESSION_BOOT_FLAG)) return getSessionCount();
+      sessionStorage.setItem(SESSION_BOOT_FLAG, '1');
+    }
+  } catch {
+    // ignore; fall through to increment
+  }
+  const next = (await getSessionCount()) + 1;
+  await safeSet(K_SESSION, String(next));
+  return next;
+}
+
+export async function purgeLegacyKeys(): Promise<void> {
+  if (isNative()) return;
   if (typeof window === 'undefined') return;
   try {
-    for (const key of LEGACY_KEYS) safeRemove(key);
+    for (const key of LEGACY_KEYS) await safeRemove(key);
     const toRemove: string[] = [];
     for (let i = 0; i < window.localStorage.length; i++) {
       const k = window.localStorage.key(i);
       if (k && k.startsWith(LEGACY_DAILY_PREFIX)) toRemove.push(k);
     }
-    for (const k of toRemove) safeRemove(k);
+    for (const k of toRemove) await safeRemove(k);
   } catch {
     // swallow
   }

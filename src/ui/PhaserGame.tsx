@@ -43,6 +43,20 @@ export function PhaserGame({ state, onCellTapped, inputDisabled }: PhaserGamePro
   }, [sceneReady, state]);
 
   useEffect(() => {
+    if (!sceneReady) return;
+    const onVisibility = (): void => {
+      const game = gameRef.current;
+      if (!game) return;
+      if (document.hidden) game.loop.sleep();
+      else game.loop.wake();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [sceneReady]);
+
+  useEffect(() => {
     const game = gameRef.current;
     if (!game) return;
     game.input.enabled = !inputDisabled;
