@@ -13,6 +13,7 @@ const K_MUTED = 'grid:v2:muted';
 const K_NOTIFICATIONS = 'grid:v2:notifications';
 const K_SESSION = 'grid:v2:sessionCount';
 const K_HAPTICS_OFF = 'grid:v2:hapticsOff';
+const K_MUSIC_OFF = 'grid:v2:musicOff';
 const K_ATTEMPT = (levelId: number): string => `grid:v2:attempt:${levelId}`;
 
 const SESSION_BOOT_FLAG = 'grid:session-advanced';
@@ -285,6 +286,16 @@ export async function getHapticsEnabled(): Promise<boolean> {
 export async function setHapticsEnabled(enabled: boolean): Promise<void> {
   if (enabled) await safeRemove(K_HAPTICS_OFF);
   else await safeSet(K_HAPTICS_OFF, '1');
+}
+
+export async function getMusicEnabled(): Promise<boolean> {
+  await ensureMigrated();
+  return (await safeGet(K_MUSIC_OFF)) !== '1';
+}
+
+export async function setMusicEnabled(enabled: boolean): Promise<void> {
+  if (enabled) await safeRemove(K_MUSIC_OFF);
+  else await safeSet(K_MUSIC_OFF, '1');
 }
 
 export async function getNotificationsEnabled(): Promise<boolean> {

@@ -9,3 +9,11 @@ Add:
 - `splash-dark.png` — optional dark variant
 
 `npm run doctor` warns until `icon.png` exists.
+
+## audio
+
+`audio/music.wav` is the master of the background music loop. It is not shipped:
+the game plays `public/audio/music.m4a`, which is encoded from it. To change the
+music, replace both files and update `MUSIC_TRACK` in `src/game/audio/music.ts`
+(`afinfo public/audio/music.m4a` prints the "valid frames" and "priming" it needs).
+`npm run test` fails if the master and those numbers disagree.

@@ -16,6 +16,12 @@ export interface TestState {
   readonly lockedEmpty: readonly boolean[];
 }
 
+export interface AudioState {
+  readonly playing: boolean;
+  readonly loop: { readonly start: number; readonly end: number } | null;
+  readonly engine: 'none' | 'running' | 'suspended' | 'closed' | 'interrupted';
+}
+
 declare global {
   interface Window {
     __gridTest?: {
@@ -26,6 +32,7 @@ declare global {
       submit: () => void;
       restart: () => void;
       getState: () => TestState | null;
+      audio: () => AudioState;
     };
   }
 }

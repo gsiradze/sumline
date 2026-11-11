@@ -10,14 +10,17 @@ import { Splash } from './components/Splash';
 import { demoLevelLimit } from '../config/demo';
 import {
   getHapticsEnabled,
+  getMusicEnabled,
   getMuted,
   getNotificationsEnabled,
   purgeLegacyKeys,
   setHapticsEnabled as persistHaptics,
+  setMusicEnabled as persistMusic,
   setMuted as persistMuted,
 } from '../storage/persistence';
 import { levelIdFromSearch } from '../platform/deepLink';
 import { scheduleReminders } from '../platform/notifications';
+import { music } from '../game/audio/music';
 import { sound } from '../game/audio/soundManager';
 import { setHapticsEnabled } from '../game/audio/haptics';
 import { adResult, settingChanged } from '../telemetry/events';
@@ -90,11 +93,14 @@ function Game() {
   const { stats, hydrated: statsHydrated, onWin: onStatsWin, onLoss: onStatsLoss } = useStats();
   const [muted, setMutedState] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(true);
+  const [musicOn, setMusicOn] = useState(true);
   const [prefsHydrated, setPrefsHydrated] = useState(false);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
   const hapticsRef = useRef(hapticsOn);
   hapticsRef.current = hapticsOn;
+  const musicRef = useRef(musicOn);
+  musicRef.current = musicOn;
   const progressRef = useRef(progress);
   progressRef.current = progress;
 
@@ -104,10 +110,11 @@ function Game() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([getMuted(), getHapticsEnabled()]).then(([m, h]) => {
+    void Promise.all([getMuted(), getHapticsEnabled(), getMusicEnabled()]).then(([m, h, mu]) => {
       if (cancelled) return;
       setMutedState(m);
       setHapticsOn(h);
+      setMusicOn(mu);
       setPrefsHydrated(true);
     });
     return () => {
@@ -119,7 +126,22 @@ function Game() {
     if (!prefsHydrated) return;
     sound.setMuted(muted);
     setHapticsEnabled(hapticsOn);
-  }, [muted, hapticsOn, prefsHydrated]);
+    // "Sound" off silences everything; "Music" only chooses whether there is a tune.
+    music.setMuted(muted);
+    music.setEnabled(musicOn);
+  }, [muted, hapticsOn, musicOn, prefsHydrated]);
+
+  // Audio may only begin from a touch or key press. Every one of them offers to
+  // start (or restart) it; once it is running this does nothing.
+  useEffect(() => {
+    const kick = (): void => music.start();
+    window.addEventListener('pointerup', kick);
+    window.addEventListener('keydown', kick);
+    return () => {
+      window.removeEventListener('pointerup', kick);
+      window.removeEventListener('keydown', kick);
+    };
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement.style;
@@ -161,6 +183,13 @@ function Game() {
     setHapticsOn(next);
     void persistHaptics(next);
     settingChanged('haptics', next);
+  }, []);
+
+  const handleToggleMusic = useCallback(() => {
+    const next = !musicRef.current;
+    setMusicOn(next);
+    void persistMusic(next);
+    settingChanged('music', next);
   }, []);
 
   const handlePickTier = useCallback((tier: Tier) => {
@@ -284,6 +313,8 @@ function Game() {
         <SettingsModal
           muted={muted}
           onToggleMute={handleToggleMute}
+          musicOn={musicOn}
+          onToggleMusic={handleToggleMusic}
           hapticsOn={hapticsOn}
           onToggleHaptics={handleToggleHaptics}
           stats={stats}

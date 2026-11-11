@@ -1,3 +1,6 @@
+import { music } from './game/audio/music';
+import type { MusicState } from './game/audio/music';
+import { sound } from './game/audio/soundManager';
 import type { ActiveGameState } from './game/domain/game-state';
 
 interface NavAPI {
@@ -21,6 +24,8 @@ interface GridTestAPI {
   readonly submit: () => void;
   readonly restart: () => void;
   readonly getState: () => ActiveGameState | null;
+  /** The music player, and whether the audio engine is running or held silent. */
+  readonly audio: () => MusicState & { readonly engine: AudioContextState | 'none' };
 }
 
 declare global {
@@ -42,6 +47,7 @@ function publish(): void {
     submit: () => game?.submit(),
     restart: () => game?.restart(),
     getState: () => game?.getState() ?? null,
+    audio: () => ({ ...music.state(), engine: sound.engineState() }),
   };
 }
 

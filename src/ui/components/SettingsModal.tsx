@@ -15,6 +15,8 @@ import { ChevronRightIcon, CloseIcon } from './icons';
 interface SettingsModalProps {
   readonly muted: boolean;
   readonly onToggleMute: () => void;
+  readonly musicOn: boolean;
+  readonly onToggleMusic: () => void;
   readonly hapticsOn: boolean;
   readonly onToggleHaptics: () => void;
   readonly stats: Stats;
@@ -85,6 +87,8 @@ function LinkRow({ href, children }: { readonly href: string; readonly children:
 export function SettingsModal({
   muted,
   onToggleMute,
+  musicOn,
+  onToggleMusic,
   hapticsOn,
   onToggleHaptics,
   stats,
@@ -157,6 +161,13 @@ export function SettingsModal({
 
       <div className="mt-2 mx-4 rounded-[16px] border border-rule-200 bg-paper-50 overflow-hidden divide-y divide-rule-200">
         <ToggleRow label="Sound" on={!muted} onToggle={onToggleMute} />
+        <ToggleRow
+          label="Music"
+          hint={muted ? 'Sound is off' : undefined}
+          on={musicOn}
+          disabled={muted}
+          onToggle={onToggleMusic}
+        />
         <ToggleRow label="Vibration" on={hapticsOn} onToggle={onToggleHaptics} />
         <ToggleRow
           label="Reminders"

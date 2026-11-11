@@ -4,11 +4,12 @@ import App from './ui/App';
 import { ErrorBoundary } from './ui/components/ErrorBoundary';
 import { admobConfig } from './config/env';
 import { handleBack } from './platform/back';
-import { bootstrapNative, isNative, onAppForeground } from './platform/native';
+import { bootstrapNative, isNative, onAppBackground, onAppForeground } from './platform/native';
 import { runConsentFlow } from './platform/consent';
 import { initCrash, reportError, setCrashReporter } from './telemetry/crash';
 import { initAnalytics, setAnalyticsConsent, setAnalyticsProvider } from './telemetry/analytics';
 import { appOpen, sessionBegin } from './telemetry/events';
+import { sound } from './game/audio/soundManager';
 import { adProvider } from './storage/ads';
 import { advanceSessionOncePerBoot, getRulesShown } from './storage/persistence';
 import { setSessionCount } from './storage/adSession';
@@ -36,6 +37,10 @@ window.addEventListener('unhandledrejection', event => {
   const reason = event.reason;
   reportError(reason instanceof Error ? reason : new Error(String(reason)));
 });
+// No sound from a game nobody is looking at: this covers the home button, a
+// phone call, the lock screen, and a full-screen ad (which puts the app behind it).
+onAppBackground(() => sound.pause());
+onAppForeground(() => sound.resume());
 // Desktop/web equivalent of the Android back button.
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape') handleBack();

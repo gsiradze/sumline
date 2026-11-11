@@ -3,6 +3,8 @@ type AudioCtx = AudioContext;
 class SoundManager {
   private ctx: AudioCtx | null = null;
   private muted = false;
+  private paused = false;
+  private unlocked = false;
   private masterGain: GainNode | null = null;
 
   setMuted(muted: boolean): void {
@@ -14,6 +16,27 @@ class SoundManager {
 
   isMuted(): boolean {
     return this.muted;
+  }
+
+  /** The one audio context of the app, shared with the music player. */
+  context(): AudioCtx | null {
+    return this.ensureCtx();
+  }
+
+  /** 'none' until the first sound has been asked for. */
+  engineState(): AudioContextState | 'none' {
+    return this.ctx?.state ?? 'none';
+  }
+
+  /** The app went to the background (or an ad covers it): nothing plays until `resume`. */
+  pause(): void {
+    this.paused = true;
+    this.ctx?.suspend().catch(() => {});
+  }
+
+  resume(): void {
+    this.paused = false;
+    if (this.unlocked) this.ctx?.resume().catch(() => {});
   }
 
   private ensureCtx(): AudioCtx | null {
@@ -35,7 +58,7 @@ class SoundManager {
   }
 
   private tone(freq: number, durationMs: number, opts: ToneOptions = {}): void {
-    if (this.muted) return;
+    if (this.muted || this.paused) return;
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     if (ctx.state === 'suspended') {
@@ -97,7 +120,8 @@ class SoundManager {
   unlock(): void {
     const ctx = this.ensureCtx();
     if (!ctx) return;
-    if (ctx.state === 'suspended') {
+    this.unlocked = true;
+    if (ctx.state === 'suspended' && !this.paused) {
       ctx.resume().catch(() => {});
     }
   }

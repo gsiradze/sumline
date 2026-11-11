@@ -53,6 +53,17 @@ export async function bootstrapNative(): Promise<void> {
   }
 }
 
+/** Fires when the app goes to the background (native) or the tab is hidden (web). */
+export function onAppBackground(listener: () => void): void {
+  if (Capacitor.isNativePlatform()) {
+    void CapacitorApp.addListener('pause', listener).catch(() => {});
+    return;
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') listener();
+  });
+}
+
 /** Fires when the app returns to the foreground (native) or the tab becomes visible (web). */
 export function onAppForeground(listener: () => void): void {
   if (Capacitor.isNativePlatform()) {
