@@ -90,6 +90,17 @@
     --sh-3: 0 6px 18px rgba(60, 42, 20, 0.09), 0 2px 4px rgba(60, 42, 20, 0.05);
     --sh-ink: inset 0 1px 2px rgba(20, 24, 40, 0.35), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 
+    /* Colours that are not simply one of the scales above in the other theme. */
+    --home-page: var(--paper-50);
+    --sunburst: #f3e5be;
+    /* The outline and the hard shadow under the round tier buttons. */
+    --pin-edge: var(--ink-900);
+    /* The page colour fading out, for content that scrolls under a fixed footer. */
+    --page-veil: rgba(250, 246, 240, 0.9);
+    --page-clear: rgba(250, 246, 240, 0);
+
+    color-scheme: light;
+
     /* Set from JS when the native banner reports its size (see App.tsx). */
     --banner-height: 0px;
     --banner-gap: 0px;
@@ -98,36 +109,52 @@
     --bottom-reserve: calc(var(--banner-height) + var(--banner-gap) + var(--safe-bottom));
   }
 
+  /* The dark theme. `dark` is put on <html> by index.html before the first paint
+     and by src/platform/theme.ts afterwards.
+
+     These are not the light colours inverted. They follow the published guidance
+     for dark interfaces, and src/styles/__tests__/darkPalette.test.ts holds them to it:
+     - The page is a dark grey with the paper's warmth, not black, and text is the
+       paper's cream, not white: pure white on black glares and seems to vibrate.
+     - Shadows do not show on a dark page, so what is raised is lighter instead:
+       page (100) < well (200) < card and open cell (50) < 300 < 400.
+     - Each accent scale runs the other way round: 700 is the light, soft shade
+       used for text, 100 the deep tint. Saturated colour is hard on the eye
+       against dark, so the text shades are paler versions of the light theme's.
+     - Text is at least 4.5:1 against what it sits on, and the shapes a player
+       has to tell apart at least 3:1.
+     - Sage-500 and ochre-500 are the light theme's own: a correct cell and the
+       gold of PLAY look the same in both. */
   .dark {
     --paper-50: #2a231e;
     --paper-100: #1c1815;
     --paper-200: #241e1a;
-    --paper-300: #2f2823;
-    --paper-400: #3b332c;
-    --rule-200: #3b332c;
-    --rule-300: #4e453b;
+    --paper-300: #37302b;
+    --paper-400: #433b34;
+    --rule-200: #413931;
+    --rule-300: #574d44;
 
     --ink-900: #ede6d8;
     --ink-700: #d2c9b7;
-    --ink-500: #a79d89;
-    --ink-400: #8a7f6c;
-    --ink-300: #6a6152;
+    --ink-500: #b1a794;
+    --ink-400: #998e7c;
+    --ink-300: #756b5c;
 
-    --ink-fill-900: #c9d1e3;
-    --ink-fill-800: #b7c0d4;
-    --ink-fill-700: #99a2b7;
+    --ink-fill-900: #9cacc9;
+    --ink-fill-800: #b6c5e0;
+    --ink-fill-700: #8896b3;
 
     --sage-700: #b6caa9;
     --sage-600: #9db692;
-    --sage-500: #89a47d;
+    --sage-500: #7b9875;
     --sage-300: #4c5f47;
     --sage-100: #2f3a2c;
 
     --clay-700: #e9b79c;
     --clay-600: #d69977;
-    --clay-500: #be7a56;
+    --clay-500: #ca805c;
     --clay-300: #6b3a22;
-    --clay-100: #3f2517;
+    --clay-100: #472a1c;
 
     --ochre-700: #e9d39a;
     --ochre-600: #d7bb6d;
@@ -138,6 +165,14 @@
     --sh-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.5);
     --sh-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4);
     --sh-3: 0 6px 18px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.4);
+
+    --home-page: var(--paper-100);
+    --sunburst: #8b6b1e;
+    --pin-edge: #0f0d0b;
+    --page-veil: rgba(28, 24, 21, 0.9);
+    --page-clear: rgba(28, 24, 21, 0);
+
+    color-scheme: dark;
   }
 
   html,
@@ -403,13 +438,13 @@
   0%,
   100% {
     box-shadow:
-      0 4px 0 var(--ink-900),
+      0 4px 0 var(--pin-edge),
       0 0 0 0 rgba(195, 154, 62, 0.6),
       0 6px 10px rgba(0, 0, 0, 0.12);
   }
   50% {
     box-shadow:
-      0 4px 0 var(--ink-900),
+      0 4px 0 var(--pin-edge),
       0 0 0 8px rgba(195, 154, 62, 0),
       0 6px 10px rgba(0, 0, 0, 0.12);
   }

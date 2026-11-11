@@ -50,8 +50,43 @@ export function GearIcon({ className }: IconProps) {
       aria-hidden="true"
       className={className}
     >
+      <path d="M9.34 5.74L9.54 2.82A9.5 9.5 0 0 1 14.46 2.82L14.66 5.74A6.8 6.8 0 0 1 16.09 6.57L18.72 5.28A9.5 9.5 0 0 1 21.18 9.54L18.75 11.17A6.8 6.8 0 0 1 18.75 12.83L21.18 14.46A9.5 9.5 0 0 1 18.72 18.72L16.09 17.43A6.8 6.8 0 0 1 14.66 18.26L14.46 21.18A9.5 9.5 0 0 1 9.54 21.18L9.34 18.26A6.8 6.8 0 0 1 7.91 17.43L5.28 18.72A9.5 9.5 0 0 1 2.82 14.46L5.25 12.83A6.8 6.8 0 0 1 5.25 11.17L2.82 9.54A9.5 9.5 0 0 1 5.28 5.28L7.91 6.57A6.8 6.8 0 0 1 9.34 5.74Z" />
+      <circle cx="12" cy="12" r="2.9" />
+    </svg>
+  );
+}
+
+export function SunIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
       <circle cx="12" cy="12" r="3" />
       <path d="M12 2.5v2.6M12 18.9v2.6M4.4 4.4l1.9 1.9M17.7 17.7l1.9 1.9M2.5 12h2.6M18.9 12h2.6M4.4 19.6l1.9-1.9M17.7 6.3l1.9-1.9" />
+    </svg>
+  );
+}
+
+export function MoonIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M20.2 14.6A8.5 8.5 0 0 1 9.4 3.8 8.5 8.5 0 1 0 20.2 14.6Z" />
     </svg>
   );
 }

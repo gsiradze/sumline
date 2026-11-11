@@ -96,3 +96,61 @@ test('on a short screen the board stops shrinking while cells are still easy to 
   const m = await measure(page);
   expect(m.pitch).toBeGreaterThanOrEqual(44);
 });
+
+test('the notice after a hint does not cover the board or its numbers', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLevel(page, 7);
+  await page.getByRole('button', { name: /Get a hint/ }).click();
+  const notice = page.getByRole('status').filter({ hasText: 'revealed' });
+  await notice.waitFor();
+  const noticeBox = (await notice.boundingBox())!;
+  const boardBox = (await page.locator('[data-board]').boundingBox())!;
+  expect(noticeBox.y + noticeBox.height).toBeLessThanOrEqual(boardBox.y);
+});
+
+// The longest label above the title, and the longest title.
+const HEADER_CASES = [
+  { width: 320, levelId: 62 },
+  { width: 320, levelId: 209 },
+  { width: 360, levelId: 62 },
+  { width: 360, levelId: 209 },
+] as const;
+
+for (const { width, levelId } of HEADER_CASES) {
+  test(`level ${levelId + 1} at ${width} px wide: the header buttons leave the title readable`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 700 });
+    await openLevel(page, levelId);
+    const gaps = await page.evaluate(() => {
+      const header = document.querySelector('header')!;
+      const textBox = (el: Element): DOMRect => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return range.getBoundingClientRect();
+      };
+      const title = header.querySelector('h1')!;
+      const texts = [textBox(title), textBox(title.previousElementSibling!)];
+      const controls = [
+        ...header.querySelectorAll('button, [aria-label*="guesses remaining"]'),
+      ].map(el => el.getBoundingClientRect());
+      const left = Math.min(...texts.map(t => t.left));
+      const right = Math.max(...texts.map(t => t.right));
+      const mid = (left + right) / 2;
+      return {
+        buttons: controls.length,
+        // Distance from the text to the nearest control on each side.
+        leftGap: left - Math.max(...controls.filter(c => c.right <= mid).map(c => c.right)),
+        rightGap: Math.min(...controls.filter(c => c.left >= mid).map(c => c.left)) - right,
+        smallestTarget: Math.min(...controls.map(c => Math.min(c.width, c.height))),
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    });
+    // Back, Settings, Rules and the guess counter.
+    expect(gaps.buttons).toBe(4);
+    expect(gaps.leftGap).toBeGreaterThanOrEqual(4);
+    expect(gaps.rightGap).toBeGreaterThanOrEqual(4);
+    expect(gaps.smallestTarget).toBeGreaterThanOrEqual(40);
+    expect(gaps.overflow).toBeLessThanOrEqual(0);
+  });
+}

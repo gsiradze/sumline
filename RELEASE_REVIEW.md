@@ -794,9 +794,10 @@ Changes made after section 10, at your request, and one that was built and then 
 | Check | Result |
 |---|---|
 | Typecheck, lint | Pass, 0 warnings |
-| Unit tests | 243/243 (was 185), 97% line coverage of the game logic |
-| e2e | 37/37 (was 14), now with real taps, drags and holds on the board, music and layout |
-| The same suite in Safari's engine | 36/37; the one failure is a clipboard permission that engine's test driver lacks |
+| Unit tests | 286/286 (was 185), 97% line coverage of the game logic |
+| e2e | 49/49 (was 14), now with real taps, drags and holds on the board, music, layout and themes |
+| The same suite in Safari's engine | 48/49; the one failure is a clipboard permission that engine's test driver lacks |
+| Light theme, every screen, before and after the dark theme went in | Pixel-identical on 28 screens except the three additions listed below (a button on the home bar, a button in the level header, a row in Settings) and the moved hint notice |
 | `npm run check:levels` | 210 levels valid, no duplicates, 8,400 random playouts consistent |
 | Production build | Pass. 1.3 MB including the music (was 2.5 MB); JavaScript 0.4 MB (was about 1.7 MB) |
 | Headless browser, production build | 180/180 checks on four phone sizes, no console errors |
@@ -816,6 +817,9 @@ Changes made after section 10, at your request, and one that was built and then 
 | Bigger board | The grid now runs from the row numbers to the same right edge as the buttons, so cells are about 16% larger wherever the screen has room (47 → 55 px on a 440-wide phone, 38 → 44 px on a 360-wide one). On a screen too short for everything, the board narrows instead of pushing Submit off screen. | `boardLayout.ts`, `.board-box` in `globals.css` |
 | Background music | The 14.5-second loop you supplied plays on every screen from the first touch. Settings has a Music switch; Sound off silences it too. Nothing plays while the app is in the background or under a full-screen ad. | `src/game/audio/music.ts` |
 | Share image and links | Where the share sheet takes files, a picture of the unsolved puzzle with the result. The link opens that level on the web version when `VITE_WEB_URL` is set. `?level=37` opens level 37. | `src/ui/shareCard.ts`, `src/platform/deepLink.ts` |
+| Dark theme | A sun or moon button on the home screen, and "Dark theme" in Settings, switch between the light look and a dark one. The light colours are untouched. Until a player uses the switch, the game follows the phone's own light/dark setting. | `.dark` in `globals.css`, `src/platform/theme.ts`, `index.html` |
+| Settings icon, and Settings inside a level | The settings button is a gear (the old icon read as a sun, which is now the theme button). The level screen has the same gear, so sound, music, vibration and the theme can be changed without leaving a level. | `icons.tsx`, `LevelGameView.tsx` |
+| Hint notice moved | "Row 3 revealed." appears over the level title. It used to sit on the column numbers, sometimes on the very number the hint had just ringed. | `LevelGameView.tsx` |
 
 ### Difficulty: tried, and taken out
 
@@ -838,8 +842,30 @@ For reference, should you ever want it, this is what pre-solved cells do to leve
 4. **The three rules pages are no longer the first thing a new player sees.** They remain behind the "?" button, and they still open first for a new player who starts on a level other than 1.
 5. **Attempts saved by earlier test builds that used a one-cell hint are dropped** when reopened (the level starts fresh). No released build ever wrote that format.
 6. **The level screen is no longer loaded lazily.** It was split off only to keep the engine out of the first load.
+7. **Until a player uses the theme switch, the game follows the phone's light/dark setting.** That is what Apple's and Google's guidance asks for, but it means a player with a dark-mode phone meets the dark look first, not the cream one in your screenshots. To always start light, make `resolveTheme` in `src/platform/theme.ts` return the light theme when there is no saved choice.
+8. **Three things look the same in both themes:** the PLAY button, the beaver, and the share image (always the light one, so shared results look alike).
+9. **On phones narrower than about 380 px the label above the level title can lose its set and level** ("INTERMEDIATE" rather than "INTERMEDIATE · 5.7"), to make room for the gear. The level number is always shown.
+10. **The recording stage uses whichever theme the game last showed** in that browser.
+
+### How the dark colours were chosen
+
+They are not the light colours inverted. Each rule below comes from published guidance and is enforced by `src/styles/__tests__/darkPalette.test.ts`.
+
+| Rule | Source | In the game |
+|---|---|---|
+| The page is a dark grey, not black | Google, Material dark theme (its base is `#121212`) | `#1c1815`: a dark grey with the paper's warmth |
+| Text is off-white, not white: pure white on dark glares and seems to vibrate | Google, Material dark theme | `#ede6d8`, the paper's cream |
+| Contrast never below 4.5:1, aim for 7:1 on small text | Apple, Human Interface Guidelines, Dark Mode; WCAG 2.2 | Body text 12–14:1, labels 6.5–7.4:1, the faintest labels 4.8–5.5:1 |
+| Raised surfaces are lighter, because shadows do not show | Apple (base and elevated backgrounds); Google (elevation overlays) | Page, then wells, then cards and open cells, each a step lighter |
+| Accent colours get paler and softer; saturated colour is hard to read on dark | Google, Material dark theme | The green, clay and ochre used for text are pale versions of the light theme's |
+| Dark colours are not simply the light ones inverted | Apple, Dark Mode | PLAY, the beaver and the tier buttons keep their own colours |
+| A large white area glows in a dark interface | Apple, Dark Mode | Marked cells and the main button are a pale ink-blue, not white |
+
+Measured on the old, unused dark palette that was already in the stylesheet: four pairs failed (faint labels 3.9:1 and 4.48:1, a number on a clay bar 4.498:1, and the "FREE" badge at 1.4:1). All pass now.
 
 ### Needs your decision
+
+Both are parked: on 2026-11-11 you said to leave sharing until the app is installed on your machine.
 
 - **Sharing the image from the Android app.** The share sheet there takes files, not pictures in memory, and writing a file needs `@capacitor/filesystem` (an official Capacitor plugin). The project rule is no new runtime dependencies without discussion, so I stopped short: in the app, Share sends the text and the link, as before. With the plugin it is about twenty more lines in `src/platform/share.ts`.
 - **A web address for shared links** (`VITE_WEB_URL`). Until it is set, shared results link to the store listing.
@@ -847,6 +873,8 @@ For reference, should you ever want it, this is what pre-solved cells do to leve
 ### Found, not changed
 
 - The Geist font imports pull in Cyrillic, Vietnamese and extended-Latin subsets. They add about 76 KB to the stylesheet and about 30 font files to the build that an English-only game never uses. Importing only the `latin-*` files, as is already done for Fraunces, removes them.
+- Sixteen colour classes with an opacity suffix (`bg-paper-50/70`, `text-ochre-500/25`, `ring-fill-800/60` and others) generate no CSS, in either theme: the colours are plain CSS variables and Tailwind 3 cannot add opacity to them. Visible effects today: the round buttons on the home bar have no fill, and unearned stars on the win screen are drawn in ink rather than faint gold. Making the classes work would change the light theme, which you asked to keep, so they are as they were.
+- The light theme itself misses the 4.5:1 text contrast in a few places (faint labels 3.4:1, numbers on the stats bars 2.5–3.7:1, gold numbers on the stats cards 2.5:1). Left alone for the same reason.
 
 ### Add to the phone checklist (section 11)
 
@@ -882,6 +910,17 @@ For reference, should you ever want it, this is what pre-solved cells do to leve
 **iPad and Safari (web version)**
 - [ ] On a fresh iPad, PLAY then tap cells and Submit straight away: everything responds.
 - [ ] Drag across cells with a finger: the page does not scroll and every cell crossed is marked.
+
+**Dark theme** ★
+- [ ] Phone in dark mode, fresh install: the game opens dark. Phone in light mode: it opens light.
+- [ ] Tap the sun on the home screen: everything turns dark at once and the button shows a moon. Close and reopen the app: still dark, with no light flash after the launch screen.
+- [ ] In dark, the status bar icons (clock, battery) are light and readable; in light they are dark. Same for the navigation bar at the bottom.
+- [ ] In dark, look at the strip behind the status bar and behind the navigation bar: note any band of the wrong colour.
+- [ ] The launch screen: it is the light one even for a dark-theme player until `assets/splash-dark.png` exists. Decide whether that needs fixing before release.
+- [ ] Play a level in dark outdoors and in a dark room: marked, correct (green), ruled-out and wrong cells are easy to tell apart at a glance.
+- [ ] The banner ad under a dark screen: note whether its white strip is acceptable.
+- [ ] Open the gear inside a level, switch Music off and Dark theme on, close: the level is exactly as you left it.
+- [ ] Use a hint: the notice appears over the level title and no number on the board is covered.
 
 **Sharing**
 - [ ] Share from the win screen in the app: the share sheet opens with the text and link.

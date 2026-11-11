@@ -21,7 +21,7 @@ export function GetAppModal({ demoLevels, onDismiss }: GetAppModalProps) {
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss"
-        className="absolute inset-0 bg-[rgba(20,18,14,0.35)]"
+        className="absolute inset-0 bg-[rgba(20,18,14,0.35)] dark:bg-[rgba(0,0,0,0.6)]"
       />
       <div className="relative w-full max-w-sm rounded-[20px] bg-paper-50 border border-rule-200 shadow-sh-3 px-5 py-6 text-center">
         <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">

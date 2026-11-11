@@ -14,6 +14,7 @@ const K_NOTIFICATIONS = 'grid:v2:notifications';
 const K_SESSION = 'grid:v2:sessionCount';
 const K_HAPTICS_OFF = 'grid:v2:hapticsOff';
 const K_MUSIC_OFF = 'grid:v2:musicOff';
+const K_THEME = 'grid:v2:theme';
 const K_ATTEMPT = (levelId: number): string => `grid:v2:attempt:${levelId}`;
 
 const SESSION_BOOT_FLAG = 'grid:session-advanced';
@@ -296,6 +297,31 @@ export async function getMusicEnabled(): Promise<boolean> {
 export async function setMusicEnabled(enabled: boolean): Promise<void> {
   if (enabled) await safeRemove(K_MUSIC_OFF);
   else await safeSet(K_MUSIC_OFF, '1');
+}
+
+// In the app the saved choice lives in Preferences, which can only be read
+// asynchronously. index.html needs it before the first paint, so a copy is kept
+// in localStorage, the one store a page can read at once.
+function copyThemeForFirstPaint(theme: string): void {
+  if (!isNative()) return;
+  try {
+    window.localStorage.setItem(K_THEME, theme);
+  } catch {
+    // swallow: the page then starts in the device's theme and corrects itself
+  }
+}
+
+/** 'light' or 'dark' once the player has chosen; null while the game follows the device. */
+export async function getThemeChoice(): Promise<string | null> {
+  await ensureMigrated();
+  const theme = await safeGet(K_THEME);
+  if (theme !== null) copyThemeForFirstPaint(theme);
+  return theme;
+}
+
+export async function setThemeChoice(theme: string): Promise<void> {
+  copyThemeForFirstPaint(theme);
+  await safeSet(K_THEME, theme);
 }
 
 export async function getNotificationsEnabled(): Promise<boolean> {

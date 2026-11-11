@@ -10,13 +10,15 @@ import type { LevelProgressMap } from '../../game/domain/levels';
 import { TOTAL_LEVELS } from '../../game/domain/tiers';
 import { Tier } from '../../game/domain/types';
 import { TIER_PLACE_NAMES } from '../tierPlaces';
-import { GearIcon, SpeakerOffIcon, SpeakerOnIcon } from './icons';
+import { GearIcon, MoonIcon, SpeakerOffIcon, SpeakerOnIcon, SunIcon } from './icons';
 import { Wordmark } from './Wordmark';
 
 interface HomeScreenProps {
   readonly progress: LevelProgressMap;
   readonly muted: boolean;
   readonly onToggleMute: () => void;
+  readonly darkTheme: boolean;
+  readonly onToggleTheme: () => void;
   readonly onPickTier: (tier: Tier) => void;
   readonly onPickLevel: (levelId: number) => void;
   readonly onOpenStats: () => void;
@@ -34,6 +36,8 @@ export function HomeScreen({
   progress,
   muted,
   onToggleMute,
+  darkTheme,
+  onToggleTheme,
   onPickTier,
   onPickLevel,
   onOpenStats,
@@ -54,7 +58,7 @@ export function HomeScreen({
     <main
       className="screen-min-h flex flex-col font-sans text-ink-900 select-none overflow-x-hidden"
       style={{
-        backgroundColor: 'var(--paper-50)',
+        backgroundColor: 'var(--home-page)',
         backgroundImage:
           'radial-gradient(rgba(120,100,60,0.05) 1px, transparent 1px), radial-gradient(rgba(195,154,62,0.05) 1px, transparent 1px)',
         backgroundSize: '3px 3px, 9px 9px',
@@ -65,6 +69,8 @@ export function HomeScreen({
         <TopBar
           muted={muted}
           onToggleMute={onToggleMute}
+          darkTheme={darkTheme}
+          onToggleTheme={onToggleTheme}
           onOpenStats={onOpenStats}
           onOpenSettings={onOpenSettings}
         />
@@ -89,11 +95,15 @@ export function HomeScreen({
 function TopBar({
   muted,
   onToggleMute,
+  darkTheme,
+  onToggleTheme,
   onOpenStats,
   onOpenSettings,
 }: {
   readonly muted: boolean;
   readonly onToggleMute: () => void;
+  readonly darkTheme: boolean;
+  readonly onToggleTheme: () => void;
   readonly onOpenStats: () => void;
   readonly onOpenSettings: () => void;
 }) {
@@ -111,6 +121,19 @@ function TopBar({
             <SpeakerOffIcon className="w-[16px] h-[16px]" />
           ) : (
             <SpeakerOnIcon className="w-[16px] h-[16px]" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          aria-label={darkTheme ? 'Switch to light theme' : 'Switch to dark theme'}
+          className="relative w-9 h-9 rounded-full bg-paper-50/70 backdrop-blur border border-rule-200 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+        >
+          <span aria-hidden="true" className="absolute -inset-1.5" />
+          {darkTheme ? (
+            <MoonIcon className="w-[16px] h-[16px]" />
+          ) : (
+            <SunIcon className="w-[16px] h-[16px]" />
           )}
         </button>
         <button
@@ -150,6 +173,13 @@ function HomeWordmark({ entering }: { readonly entering: boolean }) {
     </div>
   );
 }
+
+// PLAY is the same gold object in both themes: its face, the darker foot of its
+// face and the lip beneath it. (The ochre scale runs the other way round in the
+// dark theme, which would put a pale lip under the button.)
+const PLAY_FACE = '#c39a3e';
+const PLAY_FACE_LOW = '#a9842b';
+const PLAY_LIP = '#8b6b1e';
 
 function HomeStage({
   entering,
@@ -193,10 +223,8 @@ function HomeStage({
             letterSpacing: '0.04em',
             fontVariationSettings: '"SOFT" 60, "WONK" 1',
             color: '#fff',
-            background:
-              'linear-gradient(180deg, var(--ochre-500) 0%, var(--ochre-500) 60%, var(--ochre-600) 100%)',
-            boxShadow:
-              '0 8px 0 var(--ochre-700), 0 14px 24px rgba(139,107,30,0.38), inset 0 2px 0 rgba(255,255,255,0.45), inset 0 -2px 0 rgba(0,0,0,0.08)',
+            background: `linear-gradient(180deg, ${PLAY_FACE} 0%, ${PLAY_FACE} 60%, ${PLAY_FACE_LOW} 100%)`,
+            boxShadow: `0 8px 0 ${PLAY_LIP}, 0 14px 24px rgba(139,107,30,0.38), inset 0 2px 0 rgba(255,255,255,0.45), inset 0 -2px 0 rgba(0,0,0,0.08)`,
             zIndex: 3,
             animation: entering
               ? 'homePlayPulse 2.6s 1000ms ease-in-out infinite'
@@ -231,7 +259,7 @@ function Sunburst() {
       <path
         key={i}
         d={`M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)} L${x3.toFixed(1)} ${y3.toFixed(1)} Z`}
-        fill="#F3E5BE"
+        fill="var(--sunburst)"
         opacity={0.55}
       />,
     );
@@ -239,7 +267,7 @@ function Sunburst() {
   return (
     <svg viewBox="0 0 300 300" width={330} height={330}>
       {rays}
-      <circle cx={150} cy={150} r={118} fill="#F3E5BE" opacity={0.4} />
+      <circle cx={150} cy={150} r={118} fill="var(--sunburst)" opacity={0.4} />
     </svg>
   );
 }
@@ -526,12 +554,16 @@ function TierStopPin({
               : state === 'started'
                 ? 'var(--sage-500)'
                 : 'var(--paper-300)',
-          border: '2px solid var(--ink-900)',
-          boxShadow: '0 4px 0 var(--ink-900), 0 6px 10px rgba(0,0,0,0.12)',
+          border: '2px solid var(--pin-edge)',
+          boxShadow: '0 4px 0 var(--pin-edge), 0 6px 10px rgba(0,0,0,0.12)',
           animation: state === 'current' ? 'homeTierPulse 2.2s ease-in-out infinite' : undefined,
         }}
       >
-        <TierMotifIcon motif={stop.motif} />
+        {/* A tier nobody has started is the quiet one. On the light page its
+            pale lines already are; on the dark one they have to be dimmed. */}
+        <span className={state === 'untouched' ? 'flex dark:opacity-40' : 'flex'}>
+          <TierMotifIcon motif={stop.motif} />
+        </span>
       </span>
       <div
         className="mt-1.5 text-center font-serif font-semibold text-[13px] leading-none"

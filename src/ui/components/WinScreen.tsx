@@ -127,7 +127,7 @@ export function WinScreen({
         style={{
           bottom: 'var(--bottom-reserve)',
           background:
-            'linear-gradient(to top, var(--paper-100) 78%, rgba(250,246,240,0.9) 90%, rgba(250,246,240,0) 100%)',
+            'linear-gradient(to top, var(--paper-100) 78%, var(--page-veil) 90%, var(--page-clear) 100%)',
         }}
       >
         <div className="mx-auto w-full max-w-md">

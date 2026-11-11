@@ -19,6 +19,8 @@ interface SettingsModalProps {
   readonly onToggleMusic: () => void;
   readonly hapticsOn: boolean;
   readonly onToggleHaptics: () => void;
+  readonly darkTheme: boolean;
+  readonly onToggleTheme: () => void;
   readonly stats: Stats;
   readonly onDismiss: () => void;
 }
@@ -32,7 +34,7 @@ function Toggle({ on }: { readonly on: boolean }) {
       }`}
     >
       <span
-        className={`inline-block h-[20px] w-[20px] rounded-full bg-paper-50 shadow-sh-1 transition-transform duration-nudge ${
+        className={`inline-block h-[20px] w-[20px] rounded-full bg-paper-50 dark:bg-ink-900 shadow-sh-1 transition-transform duration-nudge ${
           on ? 'translate-x-[21px]' : 'translate-x-[3px]'
         }`}
       />
@@ -91,6 +93,8 @@ export function SettingsModal({
   onToggleMusic,
   hapticsOn,
   onToggleHaptics,
+  darkTheme,
+  onToggleTheme,
   stats,
   onDismiss,
 }: SettingsModalProps) {
@@ -169,6 +173,7 @@ export function SettingsModal({
           onToggle={onToggleMusic}
         />
         <ToggleRow label="Vibration" on={hapticsOn} onToggle={onToggleHaptics} />
+        <ToggleRow label="Dark theme" on={darkTheme} onToggle={onToggleTheme} />
         <ToggleRow
           label="Reminders"
           hint={

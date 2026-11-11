@@ -1,11 +1,13 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { handleBack } from './back';
 
+// The page colour of each theme (--paper-100).
 const PAPER = '#FAF6F0';
+const PAPER_DARK = '#1C1815';
 
 export function isNative(): boolean {
   return Capacitor.isNativePlatform();
@@ -16,12 +18,26 @@ export function platformName(): 'ios' | 'android' | 'web' {
   return p === 'ios' || p === 'android' ? p : 'web';
 }
 
+/** Status and navigation bars that read on the theme's page: dark icons on light, light on dark. */
+export async function setSystemBarsTheme(dark: boolean): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await StatusBar.setStyle({ style: dark ? StatusBarStyle.Dark : StatusBarStyle.Light });
+    await SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light });
+    if (Capacitor.getPlatform() === 'android') {
+      await StatusBar.setBackgroundColor({ color: dark ? PAPER_DARK : PAPER });
+    }
+  } catch {
+    // non-fatal
+  }
+}
+
 export async function bootstrapNative(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
+  // index.html has already put the theme on the page.
+  await setSystemBarsTheme(document.documentElement.classList.contains('dark'));
   try {
-    await StatusBar.setStyle({ style: StatusBarStyle.Light });
-    await StatusBar.setBackgroundColor({ color: PAPER });
     if (Capacitor.getPlatform() === 'android') {
       await StatusBar.setOverlaysWebView({ overlay: false });
     }

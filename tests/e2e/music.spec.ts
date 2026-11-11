@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-import { freshStart, waitForHook } from './helpers';
+import { freshStart, openLevel, waitForHook } from './helpers';
 import type { AudioState } from './helpers';
 
 const audio = (page: Page): Promise<AudioState> => page.evaluate(() => window.__gridTest!.audio());
@@ -101,4 +101,19 @@ test('nothing plays while the app is in the background', async ({ page }) => {
   await setPageHidden(page, false);
   await expect.poll(async () => (await audio(page)).engine).toBe('running');
   expect((await audio(page)).playing).toBe(true);
+});
+
+test('music can be switched off from inside a level', async ({ page }) => {
+  await openLevel(page, 7);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect.poll(async () => (await audio(page)).playing).toBe(true);
+
+  await page.getByRole('switch', { name: 'Music' }).click();
+  await expect.poll(async () => (await audio(page)).playing).toBe(false);
+
+  // Back closes Settings, not the level.
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Level 8' })).toBeVisible();
+  expect((await audio(page)).playing).toBe(false);
 });
