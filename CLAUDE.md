@@ -59,7 +59,8 @@ src/
       stats.ts               # Total stars, levels completed, wins/losses, guess-count distribution
       shareGrid.ts           # Emoji share text per level
       __tests__/             # co-located unit tests
-    audio/                   # Web Audio sound manager + haptics
+    audio/                   # Web Audio: tap and win sounds (soundManager), the background
+                             # music loop (music), haptics
   config/
     env.ts                   # AdMob IDs and ads mode (test by default, live only in release builds)
     links.ts                 # Store URL, privacy policy URL, support email, web version URL
@@ -102,6 +103,7 @@ scripts/
 android/                     # Committed native project (signing + Firebase Gradle wiring live here)
 public/
   levels.json                # Generated manifest (210 levels), committed for deterministic builds
+  audio/music.m4a            # Background music loop (its master is assets/audio/music.wav)
   favicon.svg                # Simple 5-dot grid mark
 ```
 
@@ -139,7 +141,7 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 
 - **5 tiers**: Beginner, Intermediate, Advanced, Expert, Master.
 - **Uneven batches**: 4 / 5 / 6 / 7 / 8 batches of 7 levels each → 210 total levels.
-- **Teaching**: Beginner Batch 1 (levels 0–6) starts with one whole row pre-solved and shows a one-line tip per level (`TEACHING_TIPS` in `LevelGameView.tsx`). For a new player, level 1 is a guided first solve instead of pages of rules (`tutorial.ts`, `TutorialCoach.tsx`): read the clues, see the solved row, fill the one certain line, place the rest, read the result. It can be skipped, and runs once. A new player who opens some other level first gets the short rules pages instead. The per-level `teachingHint` strings baked into `levels.json` predate the current rules and are not shown.
+- **Teaching**: Beginner Batch 1 (levels 0–6) starts with one whole row pre-solved and shows a one-line tip per level (`TEACHING_TIPS` in `LevelGameView.tsx`). For a new player, level 1 is a guided first solve instead of pages of rules (`tutorial.ts`, `TutorialCoach.tsx`): read the clues, see the solved row, fill the one certain line, place the rest, read the result. The coach only points and explains: it never disables the board or a button (an earlier version did, and on an iPad it read as the game being broken), and it moves on by itself when the player starts marking. It can be skipped, and runs once. A new player who opens some other level first gets the short rules pages instead. The per-level `teachingHint` strings baked into `levels.json` predate the current rules and are not shown.
 - **Procedural**: Remaining 203 levels are generated to match a target difficulty score inside the tier's band, with progressive widening of tolerance.
 - **Scaffolding** (3★ = solved in at most 2 guesses):
   - Beginner: 5-guess budget, 2 pre-locked cells, 3★ ≤2, 2★ ≤3.
@@ -153,6 +155,22 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 - **Hints**: 1 rewarded ad = 1 hint. A hint reveals a whole row or column: the one whose open cells could still be arranged in the most ways (`findHintLine`). The line is chosen when the ad pays out, from the board as it is then.
 - **Sharing**: the win screen shares the emoji result plus a link. Where the platform's share sheet takes files (mobile browsers), a 1080×1350 image of the unsolved puzzle with the result goes with it (`shareCard.ts`). In the Android app it is text and link only: handing an image to the native share sheet needs `@capacitor/filesystem`, which is not installed. The link is `VITE_WEB_URL/?level=N` when that is set, the store listing otherwise; the web version opens `?level=N` directly on that level.
 - **Ads**: banner app-wide (never before a new player has finished the tutorial), interstitial only on an explicit "Next" tap per `adPolicy.ts`, rewarded for hints and retries. The layout reserves banner height + safe area + a gap (`--bottom-reserve` in `globals.css`); no control may sit inside it.
+
+## Board size
+
+- The grid fills the board box: only the clue numbers sit left of it and above it, and its right edge lines up with the buttons below (`boardLayout.ts`). Margin inside the box is width the cells cannot use on a phone.
+- `.board-box` (globals.css) makes the board as wide as its column when the screen is tall enough for the header and the controls too, and narrower when it is not, down to 86% of the column (a cell and its gap are then still a 44 px target on a 360 px phone). The height budget in that rule (header 68 + controls 264, plus 76 for a tip) is checked by `tests/e2e/layout.spec.ts`.
+- Keep `.board-box` a block, not a flex item: Safari takes a flex item's height from its column width and ignores the narrower width.
+- CI runs the browser tests in Chromium only. The suite also passes in Safari's engine (WebKit), which is what an iPad uses; run it there after touching the board, input or layout.
+
+## Audio
+
+- **Music** is one seamless loop, `public/audio/music.m4a`, played through Web Audio by `src/game/audio/music.ts`. It plays on every screen, not in the dev capture stage.
+- **Looping exactly.** AAC files carry padding, and browsers differ in how much of it they leave after decoding (measured: Chrome trims all of it, another Chromium build leaves 34 ms at the end). So the player loops the exact length in `MUSIC_TRACK`, not the decoded buffer. To change the music, replace both `public/audio/music.m4a` and its master `assets/audio/music.wav`, and update `MUSIC_TRACK` (`afinfo` prints the numbers). A unit test fails if the master and `MUSIC_TRACK` disagree.
+- **Starting.** Browsers only let audio begin from a touch or key press, so music starts on the first one (`App.tsx`).
+- **Settings.** "Sound" off silences everything; "Music" only chooses whether the tune plays (`grid:v2:musicOff`; on by default).
+- **Background.** All audio is suspended while the app is in the background (`sound.pause()` in `main.tsx`). That is also what silences it under a full-screen ad, which puts the app behind it.
+- **Level.** `MUSIC_VOLUME` in `music.ts` was set from measurement to sit just under the tap sounds. Nobody has listened to the mix on a phone yet.
 
 ## Conventions
 

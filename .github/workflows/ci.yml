@@ -28,7 +28,8 @@ jobs:
 
   e2e:
     needs: check
-    runs-on: ubuntu-latest
+    # Playwright 1.59 has no browser build for Ubuntu 26.04, which ubuntu-latest now is.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

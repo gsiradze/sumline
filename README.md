@@ -68,7 +68,7 @@ npm run version:apply      # sync app version from package.json to native projec
 See [CLAUDE.md](./CLAUDE.md) for the full stack, architecture, and conventions. Short version:
 
 - `src/game/domain/` — pure TypeScript game logic (puzzle generation, solver, feedback, tiers, stars). Fully unit-tested with ≥80% coverage.
-- `src/game/audio/` — sounds and haptics.
+- `src/game/audio/` — tap sounds, the background music loop, and haptics. Music plays `public/audio/music.m4a`; see `assets/README.md` for how to replace it.
 - `src/ui/` — everything on screen in React, including the board (an SVG component that draws domain state and turns touches into moves).
 - `src/storage/`, `src/platform/`, `src/telemetry/`, `src/config/` — async persistence, native helpers, Firebase telemetry, and env/AdMob config.
 - `scripts/build-levels.ts` — bakes the 210-level ladder into `public/levels.json` (committed, frozen).

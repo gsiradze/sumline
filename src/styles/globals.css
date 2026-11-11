@@ -16,6 +16,35 @@
     padding-top: var(--safe-top);
     padding-bottom: var(--bottom-reserve);
   }
+
+  /* The board on the level screen. It is as wide as its column when the screen
+     is tall enough for the header and the controls as well; on a shorter screen
+     it narrows, down to --board-floor of the column, so the controls stay
+     reachable. --board-chrome is everything else on the screen: the header (68)
+     and the controls under the board (264), plus --board-above for a tip when
+     the level has one. tests/e2e/layout.spec.ts fails if those drift.
+     --board-ratio, --board-floor and --board-above come from boardLayout.ts. */
+  .board-box {
+    --board-column: min(100vw - 24px, 28rem);
+    --board-chrome: calc(var(--safe-top) + var(--bottom-reserve) + 332px + var(--board-above, 0px));
+    --board-room: calc(100vh - var(--board-chrome));
+    position: relative;
+    /* Centred as a block, not as a flex item: Safari takes a flex item's height
+       from its column width, ignoring the narrower width below. */
+    margin-inline: auto;
+    aspect-ratio: var(--board-ratio);
+    width: clamp(
+      calc(var(--board-column) * var(--board-floor)),
+      calc(var(--board-room) * var(--board-ratio)),
+      var(--board-column)
+    );
+  }
+
+  @supports (height: 100dvh) {
+    .board-box {
+      --board-room: calc(100dvh - var(--board-chrome));
+    }
+  }
 }
 
 @layer base {

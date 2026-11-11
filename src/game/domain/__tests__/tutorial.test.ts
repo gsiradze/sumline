@@ -92,7 +92,6 @@ describe('the tutorial level as shipped', () => {
 
     const fill = coachView(start, 2, forced)!;
     expect(fill.step).toBe(CoachStep.ForcedLine);
-    expect(fill.only).toBe(true);
     expect(fill.cells).toEqual(forced!.open);
     expect(fill.text).toContain(`needs ${forced!.need}`);
 
@@ -101,7 +100,7 @@ describe('the tutorial level as shipped', () => {
     expect(isLineMarked(s, forced!)).toBe(true);
     const place = coachView(s, 2, forced)!;
     expect(place.step).toBe(CoachStep.Place);
-    expect(place.only).toBe(false);
+    expect(place.cells).toHaveLength(0);
     expect(place.text).toContain(`${s.puzzle.filledCount - markedCount(s)} marks left`);
 
     for (let i = 0; i < CELL_COUNT; i++) {
@@ -109,6 +108,17 @@ describe('the tutorial level as shipped', () => {
     }
     expect(coachView(s, 3, forced)!.step).toBe(CoachStep.Submit);
     expect(coachView(submitGuess(s), 3, forced)).toBeNull();
+  });
+
+  it('tells a player who placed every mark their own way to submit', () => {
+    // Every mark is on the board, none of them on the line the coach points at.
+    let s = start;
+    const elsewhere = [...Array(CELL_COUNT).keys()].filter(
+      i => !forced!.open.includes(i) && s.currentMarks[i] !== 1,
+    );
+    for (const i of elsewhere) s = toggleMark(s, i);
+    expect(markedCount(s)).toBe(s.puzzle.filledCount);
+    expect(coachView(s, 2, forced)!.step).toBe(CoachStep.Submit);
   });
 
   it('explains the result after a guess that did not win', () => {

@@ -22,8 +22,6 @@ export interface BoardSpotlight {
   readonly cells: readonly number[];
   readonly rows?: readonly number[];
   readonly cols?: readonly number[];
-  /** Only the picked-out cells respond to touch. */
-  readonly only?: boolean;
 }
 
 interface BoardProps {
@@ -104,10 +102,9 @@ export function Board({
   const [flash, setFlash] = useState<ReadonlySet<number> | null>(null);
   const [shimmer, setShimmer] = useState(false);
 
-  const only = useMemo(() => (spotlight?.only ? new Set(spotlight.cells) : null), [spotlight]);
   // Pointer handlers read the latest props through this, so they never go stale mid-stroke.
-  const live = useRef({ state, tool, onMark, onNote, inputDisabled, only });
-  live.current = { state, tool, onMark, onNote, inputDisabled, only };
+  const live = useRef({ state, tool, onMark, onNote, inputDisabled });
+  live.current = { state, tool, onMark, onNote, inputDisabled };
 
   const endStroke = useCallback((): void => {
     const stroke = strokeRef.current;
@@ -189,8 +186,6 @@ export function Board({
   const extend = (stroke: Stroke, cell: number): void => {
     if (stroke.dead || stroke.kind === null || stroke.visited.has(cell)) return;
     stroke.visited.add(cell);
-    const allowed = live.current.only;
-    if (allowed && !allowed.has(cell)) return;
     const next = extendStroke(stroke.predicted, cell, stroke.kind);
     if (next === stroke.predicted) return;
     stroke.predicted = next;
@@ -204,7 +199,7 @@ export function Board({
   };
 
   const handlePointerDown = (e: ReactPointerEvent<SVGSVGElement>): void => {
-    const { state: now, inputDisabled: blocked, only: allowed } = live.current;
+    const { state: now, inputDisabled: blocked } = live.current;
     if (blocked) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (strokeRef.current) {
@@ -215,7 +210,6 @@ export function Board({
     const point = toBoard(e);
     const cell = point ? cellAtPoint(point) : null;
     if (!point || cell === null || !canToggle(now, cell)) return;
-    if (allowed && !allowed.has(cell)) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -308,7 +302,7 @@ export function Board({
       ref={svgRef}
       data-board=""
       viewBox={`0 0 ${layout.width} ${layout.height}`}
-      className="block w-full h-full touch-none select-none"
+      className="block w-full h-full overflow-visible touch-none select-none"
       role="img"
       aria-label="Puzzle board"
       onPointerDown={handlePointerDown}
@@ -339,7 +333,7 @@ export function Board({
       {Array.from({ length: CELL_COUNT }, (_, i) => {
         const { x, y } = cellOrigin(i);
         const look = lookFor(i);
-        const open = playable && canToggle(state, i) && (!only || only.has(i));
+        const open = playable && canToggle(state, i);
         const motionClass = shimmer
           ? 'cell-anim cell-shimmer'
           : look === 'marked-wrong'
@@ -353,7 +347,6 @@ export function Board({
             transform={`translate(${x} ${y})`}
             data-cell={i}
             data-look={look}
-            opacity={only && !only.has(i) ? 0.45 : undefined}
             className={open ? 'cursor-pointer' : undefined}
           >
             <g

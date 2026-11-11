@@ -22,25 +22,11 @@ test('level 1 walks a new player through a first solve', async ({ page }) => {
   // No wall of rules first: the board is right there.
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  // While the player is reading, the board does not react.
-  const s0 = await getState(page);
-  const anyOpen = [...Array(36).keys()].find(i => !s0.lockedFilled[i] && !s0.lockedEmpty[i])!;
-  const p = await centreOf(page, anyOpen);
-  await page.mouse.click(p.x, p.y);
-  expect((await getState(page)).currentMarks[anyOpen]).toBe(0);
-
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(coach(page)).toContainText('This row is solved for you');
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(coach(page)).toContainText('Your turn. This row needs 4');
-
-  // Only the highlighted row can be touched for now.
-  const outside = [...Array(36).keys()].find(
-    i => !s0.lockedFilled[i] && !s0.lockedEmpty[i] && Math.floor(i / 6) !== 5,
-  )!;
-  const q = await centreOf(page, outside);
-  await page.mouse.click(q.x, q.y);
-  expect((await getState(page)).currentMarks[outside]).toBe(0);
+  await expect(page.locator('[data-board] rect.board-ring')).toHaveCount(4);
 
   const from = await centreOf(page, 30);
   const to = await centreOf(page, 35);
@@ -51,11 +37,6 @@ test('level 1 walks a new player through a first solve', async ({ page }) => {
   const s1 = await getState(page);
   expect([30, 31, 32, 35].map(i => s1.currentMarks[i])).toEqual([1, 1, 1, 1]);
   await expect(coach(page)).toContainText('Now the rest.');
-
-  // The whole board is open again.
-  await page.mouse.click(q.x, q.y);
-  expect((await getState(page)).currentMarks[outside]).toBe(1);
-  await page.mouse.click(q.x, q.y);
 
   await markAnswer(page);
   await expect(coach(page)).toContainText('All 16 marks are placed');
@@ -69,6 +50,36 @@ test('level 1 walks a new player through a first solve', async ({ page }) => {
   await openLevel(page, 0);
   await expect(coach(page)).toHaveCount(0);
   await expect(page.getByText('One row is done for you.')).toBeVisible();
+});
+
+test('nothing is ever locked: the tutorial follows a player who just starts playing', async ({
+  page,
+}) => {
+  // Reported from an iPad: with the coach on its first step, the board and the
+  // buttons under it did nothing, and it looked broken.
+  await openLevel(page, 0);
+  await expect(coach(page)).toContainText('Each number counts the filled cells');
+  for (const name of ['Submit guess', 'Mark', 'Rule out']) {
+    await expect(
+      page.getByRole(name === 'Submit guess' ? 'button' : 'radio', { name }),
+    ).toBeEnabled();
+  }
+
+  // Tapping a cell while the coach is still explaining marks it...
+  const s0 = await getState(page);
+  const outside = [...Array(36).keys()].find(
+    i => !s0.lockedFilled[i] && !s0.lockedEmpty[i] && Math.floor(i / 6) !== 5,
+  )!;
+  const p = await centreOf(page, outside);
+  await page.mouse.click(p.x, p.y);
+  await expect.poll(async () => (await getState(page)).currentMarks[outside]).toBe(1);
+  // ...and the coach stops explaining and points at the next thing to do.
+  await expect(coach(page)).toContainText('Your turn. This row needs 4');
+  await expect(page.getByRole('button', { name: 'Next' })).toHaveCount(0);
+
+  // Cells off the suggested row keep working too.
+  await page.mouse.click(p.x, p.y);
+  await expect.poll(async () => (await getState(page)).currentMarks[outside]).toBe(0);
 });
 
 test('after a guess the coach explains the result', async ({ page }) => {
