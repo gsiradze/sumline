@@ -28,10 +28,17 @@ coverage
 # TS incremental build
 *.tsbuildinfo
 
-# Native projects — regenerated per-machine via `npx cap add`; native tweaks
-# are re-applied idempotently by `npm run patch:native`.
-/ios
-/android
+# android/ is committed: signing config, version codes and the Firebase Gradle
+# wiring live there and must not be lost. Its own .gitignore keeps build output,
+# copied web assets, keystores and keystore.properties out of git.
+# ios/ does not exist yet; commit it too once it is created.
+
+# Source maps are kept for decoding crash stacks, never shipped or committed
+sourcemaps
+
+# Test output
+test-results
+playwright-report
 
 # Env (real ad-unit IDs / keys); .env.example is committed
 .env

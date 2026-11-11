@@ -33,9 +33,13 @@ const config: CapacitorConfig = {
       backgroundColor: '#FAF6F0',
       overlaysWebView: false,
     },
-    Preferences: {
-      group: 'sumline',
+    // Dark status and navigation icons whatever the system theme: the app is
+    // always light paper.
+    SystemBars: {
+      style: 'LIGHT',
     },
+    // Saves live in the Preferences plugin's default group. Never call
+    // Preferences.configure({ group }) after launch: it would hide every save.
   },
 };
 

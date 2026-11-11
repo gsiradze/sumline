@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
-import { reportError } from '../telemetry/crash';
 
+// Google's public sample units. They always fill and never earn or count as
+// real traffic, so they are safe to tap during development and device testing.
 const TEST_ADMOB = {
   appIdIos: 'ca-app-pub-3940256099942544~1458002511',
   appIdAndroid: 'ca-app-pub-3940256099942544~3347511713',
@@ -19,43 +20,71 @@ export interface AdMobIds {
   readonly banner: string;
 }
 
-const isDev = import.meta.env.DEV === true;
+export type AdsMode = 'test' | 'live';
 
-function currentPlatform(): 'ios' | 'android' {
-  return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
+export interface AdMobConfig {
+  readonly mode: AdsMode;
+  /** null when live mode is requested but an ID is missing: ads stay off. */
+  readonly ids: AdMobIds | null;
+  readonly missing: readonly string[];
 }
 
-function resolve(name: string, value: string | undefined, testFallback: string): string {
-  if (isDev) return testFallback;
-  if (!value) {
-    reportError(new Error(`Missing required env var ${name}`), { envVar: name });
-    return testFallback;
-  }
-  return value;
+// Live ads are opt-in per build (`VITE_ADS_MODE=live`, set by the release
+// scripts). Every other build, including device builds, shows test ads, so
+// nobody ends up tapping their own live units while testing.
+export function adsMode(): AdsMode {
+  return import.meta.env.VITE_ADS_MODE === 'live' ? 'live' : 'test';
 }
 
-export function admobIds(): AdMobIds {
-  const e = import.meta.env;
-  if (currentPlatform() === 'ios') {
+export function admobConfig(): AdMobConfig {
+  const ios = Capacitor.getPlatform() === 'ios';
+  if (adsMode() === 'test') {
     return {
-      appId: resolve('VITE_ADMOB_APP_ID_IOS', e.VITE_ADMOB_APP_ID_IOS, TEST_ADMOB.appIdIos),
-      rewarded: resolve('VITE_ADMOB_REWARDED_IOS', e.VITE_ADMOB_REWARDED_IOS, TEST_ADMOB.rewardedIos),
-      interstitial: resolve('VITE_ADMOB_INTERSTITIAL_IOS', e.VITE_ADMOB_INTERSTITIAL_IOS, TEST_ADMOB.interstitialIos),
-      banner: resolve('VITE_ADMOB_BANNER_IOS', e.VITE_ADMOB_BANNER_IOS, TEST_ADMOB.bannerIos),
+      mode: 'test',
+      ids: ios
+        ? {
+            appId: TEST_ADMOB.appIdIos,
+            rewarded: TEST_ADMOB.rewardedIos,
+            interstitial: TEST_ADMOB.interstitialIos,
+            banner: TEST_ADMOB.bannerIos,
+          }
+        : {
+            appId: TEST_ADMOB.appIdAndroid,
+            rewarded: TEST_ADMOB.rewardedAndroid,
+            interstitial: TEST_ADMOB.interstitialAndroid,
+            banner: TEST_ADMOB.bannerAndroid,
+          },
+      missing: [],
     };
   }
-  return {
-    appId: resolve('VITE_ADMOB_APP_ID_ANDROID', e.VITE_ADMOB_APP_ID_ANDROID, TEST_ADMOB.appIdAndroid),
-    rewarded: resolve('VITE_ADMOB_REWARDED_ANDROID', e.VITE_ADMOB_REWARDED_ANDROID, TEST_ADMOB.rewardedAndroid),
-    interstitial: resolve(
-      'VITE_ADMOB_INTERSTITIAL_ANDROID',
-      e.VITE_ADMOB_INTERSTITIAL_ANDROID,
-      TEST_ADMOB.interstitialAndroid,
-    ),
-    banner: resolve('VITE_ADMOB_BANNER_ANDROID', e.VITE_ADMOB_BANNER_ANDROID, TEST_ADMOB.bannerAndroid),
-  };
+
+  const e = import.meta.env;
+  const wanted: readonly (readonly [keyof AdMobIds, string, string | undefined])[] = ios
+    ? [
+        ['appId', 'VITE_ADMOB_APP_ID_IOS', e.VITE_ADMOB_APP_ID_IOS],
+        ['rewarded', 'VITE_ADMOB_REWARDED_IOS', e.VITE_ADMOB_REWARDED_IOS],
+        ['interstitial', 'VITE_ADMOB_INTERSTITIAL_IOS', e.VITE_ADMOB_INTERSTITIAL_IOS],
+        ['banner', 'VITE_ADMOB_BANNER_IOS', e.VITE_ADMOB_BANNER_IOS],
+      ]
+    : [
+        ['appId', 'VITE_ADMOB_APP_ID_ANDROID', e.VITE_ADMOB_APP_ID_ANDROID],
+        ['rewarded', 'VITE_ADMOB_REWARDED_ANDROID', e.VITE_ADMOB_REWARDED_ANDROID],
+        ['interstitial', 'VITE_ADMOB_INTERSTITIAL_ANDROID', e.VITE_ADMOB_INTERSTITIAL_ANDROID],
+        ['banner', 'VITE_ADMOB_BANNER_ANDROID', e.VITE_ADMOB_BANNER_ANDROID],
+      ];
+
+  const missing = wanted.filter(([, , value]) => !isRealId(value)).map(([, name]) => name);
+  if (missing.length > 0) return { mode: 'live', ids: null, missing };
+
+  const ids = Object.fromEntries(
+    wanted.map(([key, , value]) => [key, value]),
+  ) as unknown as AdMobIds;
+  return { mode: 'live', ids, missing: [] };
 }
 
-export function usingAdMobTestIds(): boolean {
-  return isDev;
+function isRealId(value: string | undefined): value is string {
+  if (!value) return false;
+  if (value.includes('xxxx')) return false;
+  // Never let a sample unit ship in a live build.
+  return !value.startsWith('ca-app-pub-3940256099942544');
 }

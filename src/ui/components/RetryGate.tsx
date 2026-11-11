@@ -10,10 +10,13 @@ interface RetryGateProps {
   readonly onBack: () => void;
 }
 
+const CLOSE_CALL_CELLS = 3;
+
 export function RetryGate({ state, retry, onRetry, onBack }: RetryGateProps) {
   const last = state.feedbacks[state.feedbacks.length - 1];
   const cellsAway = last ? countCellsAway(last) : 0;
   const [pending, setPending] = useState(false);
+  const [adUnavailable, setAdUnavailable] = useState(false);
 
   const handleFreeRetry = useCallback(() => {
     retry.consumeFreeRetry();
@@ -27,9 +30,11 @@ export function RetryGate({ state, retry, onRetry, onBack }: RetryGateProps) {
       return;
     }
     setPending(true);
+    setAdUnavailable(false);
     try {
-      const granted = await retry.requestAdRetries();
-      if (!granted) return;
+      const outcome = await retry.requestAdRetries();
+      if (outcome === 'error') setAdUnavailable(true);
+      if (outcome !== 'granted') return;
       retry.consumeAdRetry();
       onRetry();
     } finally {
@@ -40,31 +45,26 @@ export function RetryGate({ state, retry, onRetry, onBack }: RetryGateProps) {
   const isFree = retry.canFreeRetry;
 
   return (
-    <section
-      className="px-4 pt-2 text-center"
-      role="status"
-      aria-live="polite"
-      style={{ paddingBottom: 'max(28px, env(safe-area-inset-bottom))' }}
-    >
+    <section className="px-4 pt-2 pb-5 text-center" role="status" aria-live="polite">
       <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-clay-700">
         Out of guesses
       </div>
       <h2 className="font-serif text-[26px] font-medium leading-[1.1] tracking-[-0.01em] text-ink-900 mt-1.5">
-        The answer was —
+        {cellsAway <= CLOSE_CALL_CELLS ? 'So close.' : 'Not this time.'}
       </h2>
       <p className="mt-2 font-sans text-[13px] text-ink-500">
         You were{' '}
         <span className="font-serif text-[15px] font-semibold text-clay-700 tabular-nums">
           {cellsAway}
         </span>{' '}
-        {cellsAway === 1 ? 'cell' : 'cells'} away.
+        {cellsAway === 1 ? 'cell' : 'cells'} away. The puzzle stays the same when you retry.
       </p>
 
-      <div className="mt-5">
+      <div className="mt-5 mx-auto w-full max-w-md">
         <button
           type="button"
           onClick={isFree ? handleFreeRetry : handleAdRetry}
-          disabled={pending}
+          disabled={pending || !retry.hydrated}
           className="w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold inline-flex items-center justify-center gap-2.5 shadow-sh-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60"
         >
           {isFree
@@ -80,6 +80,11 @@ export function RetryGate({ state, retry, onRetry, onBack }: RetryGateProps) {
             </span>
           )}
         </button>
+        {adUnavailable && (
+          <p role="alert" className="mt-2 font-sans text-[13px] text-clay-700">
+            No ad available right now. Check your connection and try again.
+          </p>
+        )}
         <button
           type="button"
           onClick={onBack}

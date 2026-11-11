@@ -11,6 +11,8 @@ import {
 } from '../../game/domain/levels';
 import type { LevelProgressMap } from '../../game/domain/levels';
 import { configForTier, firstLevelIdOfTier, levelsInTier } from '../../game/domain/tiers';
+import { useBackHandler } from '../hooks/useBackHandler';
+import { TIER_PLACE_NAMES } from '../tierPlaces';
 import { ArrowLeftIcon, LockIcon, StarIcon } from './icons';
 import { LevelCard } from './LevelCard';
 
@@ -22,6 +24,7 @@ interface TierViewProps {
 }
 
 export function TierView({ tier, progress, onBack, onPickLevel }: TierViewProps) {
+  useBackHandler(onBack);
   const config = configForTier(tier);
   const baseId = firstLevelIdOfTier(tier);
   const earnedStars = tierStars(progress, tier);
@@ -38,16 +41,19 @@ export function TierView({ tier, progress, onBack, onPickLevel }: TierViewProps)
 
   return (
     <main className="screen-min-h flex flex-col font-sans text-ink-900 bg-paper-100">
-      <header className="px-5 pt-6 pb-4 border-b border-rule-200">
+      <header className="px-5 pt-2 pb-4 border-b border-rule-200">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 -ml-1 text-ink-500 hover:text-ink-900 font-mono text-[11px] tracking-[0.14em] uppercase"
+          className="h-11 pr-4 inline-flex items-center gap-1.5 -ml-1 text-ink-500 hover:text-ink-900 font-mono text-[11px] tracking-[0.14em] uppercase"
         >
           <ArrowLeftIcon className="w-4 h-4" />
           Tiers
         </button>
-        <div className="mt-2 flex items-baseline justify-between">
+        <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-ochre-700">
+          {TIER_PLACE_NAMES[tier]}
+        </div>
+        <div className="mt-1 flex items-baseline justify-between">
           <h1 className="font-serif text-[28px] font-semibold tracking-[-0.01em]">
             {config.label}
           </h1>

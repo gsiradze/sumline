@@ -17,9 +17,13 @@ describe('starsForWin', () => {
     expect(starsForWin(Tier.Beginner, 5)).toBe(1);
   });
 
-  it('tightens thresholds for Master (no 2★ tier — nail it or scrape it)', () => {
-    expect(starsForWin(Tier.Master, 2)).toBe(3);
-    expect(starsForWin(Tier.Master, 3)).toBe(1);
+  it('gives two stars for a last-guess win in Expert and Master', () => {
+    // Even perfect play needs the third guess on many of these levels, so
+    // using it is not a one-star scrape.
+    for (const tier of [Tier.Expert, Tier.Master]) {
+      expect(starsForWin(tier, 2)).toBe(3);
+      expect(starsForWin(tier, 3)).toBe(2);
+    }
   });
 
   it('never returns 0 for a valid win', () => {

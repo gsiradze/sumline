@@ -7,14 +7,14 @@ import {
   tierStars,
 } from '../../game/domain/levels';
 import type { LevelProgressMap } from '../../game/domain/levels';
-import { TOTAL_LEVELS, levelsInTier } from '../../game/domain/tiers';
+import { TOTAL_LEVELS } from '../../game/domain/tiers';
 import { Tier } from '../../game/domain/types';
-import type { Stats } from '../../game/domain/stats';
-import { FlameIcon, GearIcon, SpeakerOffIcon, SpeakerOnIcon } from './icons';
+import { TIER_PLACE_NAMES } from '../tierPlaces';
+import { GearIcon, SpeakerOffIcon, SpeakerOnIcon } from './icons';
+import { Wordmark } from './Wordmark';
 
 interface HomeScreenProps {
   readonly progress: LevelProgressMap;
-  readonly stats: Stats;
   readonly muted: boolean;
   readonly onToggleMute: () => void;
   readonly onPickTier: (tier: Tier) => void;
@@ -30,19 +30,8 @@ function firstIncompleteLevelId(progress: LevelProgressMap): number {
   return TOTAL_LEVELS - 1;
 }
 
-function dailyLevelId(): number {
-  const today = new Date();
-  const key =
-    today.getUTCFullYear() * 10000 +
-    (today.getUTCMonth() + 1) * 100 +
-    today.getUTCDate();
-  const span = levelsInTier(Tier.Beginner) + levelsInTier(Tier.Intermediate);
-  return key % span;
-}
-
 export function HomeScreen({
   progress,
-  stats,
   muted,
   onToggleMute,
   onPickTier,
@@ -56,23 +45,15 @@ export function HomeScreen({
     return () => window.clearTimeout(t);
   }, []);
 
-  const continueLevelId = useMemo(
-    () => firstIncompleteLevelId(progress),
-    [progress],
-  );
+  const continueLevelId = useMemo(() => firstIncompleteLevelId(progress), [progress]);
   const continueTier = tierForLevelId(continueLevelId);
   const continueStars = progressForLevel(progress, continueLevelId).stars;
   const continueCoords = coordsForLevelId(continueLevelId);
-
-  const todayDaily = useMemo(dailyLevelId, []);
-  const dailyDone = progressForLevel(progress, todayDaily).completed;
 
   return (
     <main
       className="screen-min-h flex flex-col font-sans text-ink-900 select-none overflow-x-hidden"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
         backgroundColor: 'var(--paper-50)',
         backgroundImage:
           'radial-gradient(rgba(120,100,60,0.05) 1px, transparent 1px), radial-gradient(rgba(195,154,62,0.05) 1px, transparent 1px)',
@@ -93,11 +74,6 @@ export function HomeScreen({
           continueLevelNumber={continueLevelId + 1}
           continueStars={continueStars}
           onPlay={() => onPickLevel(continueLevelId)}
-        />
-        <HomeDaily
-          done={dailyDone}
-          streak={stats.dayStreak}
-          onPlay={() => onPickLevel(todayDaily)}
         />
         <HomeTierMap
           progress={progress}
@@ -122,15 +98,15 @@ function TopBar({
   readonly onOpenSettings: () => void;
 }) {
   return (
-    <div className="px-4 pt-5 flex items-center justify-between z-10">
-      <div className="flex items-center gap-2">
+    <div className="px-4 pt-4 flex items-center justify-between z-10">
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onToggleMute}
           aria-label={muted ? 'Unmute sound' : 'Mute sound'}
           className="relative w-9 h-9 rounded-full bg-paper-50/70 backdrop-blur border border-rule-200 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
         >
-          <span aria-hidden="true" className="absolute -inset-2.5" />
+          <span aria-hidden="true" className="absolute -inset-1.5" />
           {muted ? (
             <SpeakerOffIcon className="w-[16px] h-[16px]" />
           ) : (
@@ -141,17 +117,19 @@ function TopBar({
           type="button"
           onClick={onOpenSettings}
           aria-label="Settings"
-          className="w-9 h-9 rounded-full bg-paper-50/70 backdrop-blur border border-rule-200 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+          className="relative w-9 h-9 rounded-full bg-paper-50/70 backdrop-blur border border-rule-200 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
         >
+          <span aria-hidden="true" className="absolute -inset-1.5" />
           <GearIcon className="w-[16px] h-[16px]" />
         </button>
       </div>
       <button
         type="button"
         onClick={onOpenStats}
-        className="font-mono text-[10px] tracking-[0.08em] text-ink-500 border border-rule-200 bg-paper-50/60 rounded-full px-2.5 py-1 active:scale-95 transition-transform duration-nudge"
+        className="relative font-mono text-[10px] tracking-[0.08em] text-ink-500 border border-rule-200 bg-paper-50/60 rounded-full px-3 py-1.5 active:scale-95 transition-transform duration-nudge"
       >
-        PARENTS · STATS
+        <span aria-hidden="true" className="absolute -inset-x-2 -inset-y-2.5" />
+        STATS
       </button>
     </div>
   );
@@ -162,45 +140,12 @@ function HomeWordmark({ entering }: { readonly entering: boolean }) {
     <div
       className="text-center mt-10"
       style={{
-        animation: entering
-          ? 'homeWmWobble 700ms 300ms cubic-bezier(.2,.7,.2,1) both'
-          : undefined,
+        animation: entering ? 'homeWmWobble 700ms 300ms cubic-bezier(.2,.7,.2,1) both' : undefined,
       }}
     >
-      <div
-        className="inline-flex items-baseline font-serif font-extrabold text-[54px] leading-none tracking-[-0.025em] text-ink-900"
-        style={{ fontVariationSettings: '"SOFT" 100, "WONK" 1' }}
-      >
-        <span>Suml</span>
-        <span className="relative inline-block" style={{ width: '0.34em' }}>
-          <span
-            className="absolute bottom-0 rounded-[1px] bg-ink-900"
-            style={{
-              width: '0.12em',
-              height: '0.64em',
-              left: '50%',
-              transform: 'translateX(-50%)',
-            }}
-          />
-          <span
-            className="absolute"
-            style={{
-              top: '-0.08em',
-              left: '50%',
-              transform: 'translateX(-50%) rotate(-6deg)',
-              width: '0.38em',
-              height: '0.38em',
-              background: 'var(--ink-fill-800)',
-              borderRadius: '3px',
-              boxShadow:
-                'inset 0 2px 2px rgba(20,24,40,.45), 0 1px 0 rgba(0,0,0,.1)',
-            }}
-          />
-        </span>
-        <span>ne</span>
-      </div>
+      <Wordmark size={54} bold />
       <div className="mt-2 font-mono text-[10px] tracking-[0.24em] uppercase text-ochre-700">
-        Daily puzzles
+        {TOTAL_LEVELS} deduction puzzles
       </div>
     </div>
   );
@@ -217,8 +162,7 @@ function HomeStage({
   readonly continueStars: number;
   readonly onPlay: () => void;
 }) {
-  const starSymbols =
-    '★'.repeat(continueStars) + '☆'.repeat(Math.max(0, 3 - continueStars));
+  const starSymbols = '★'.repeat(continueStars) + '☆'.repeat(Math.max(0, 3 - continueStars));
   return (
     <div className="relative flex items-center justify-center mt-2" style={{ height: 330 }}>
       <div className="relative" style={{ width: 330, height: 330 }}>
@@ -266,8 +210,7 @@ function HomeStage({
           className="absolute left-1/2 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-500 whitespace-nowrap"
           style={{ top: 288, transform: 'translateX(-50%)' }}
         >
-          LEVEL {continueLevelNumber} ·{' '}
-          <span className="text-ochre-600">{starSymbols}</span>
+          LEVEL {continueLevelNumber} · <span className="text-ochre-600">{starSymbols}</span>
         </div>
       </div>
     </div>
@@ -301,6 +244,10 @@ function Sunburst() {
   );
 }
 
+// Where the tail and the waving arm meet the body, in the mascot's viewBox.
+const TAIL_JOINT = { x: 90, y: 210 } as const;
+const SHOULDER_JOINT = { x: 201, y: 168 } as const;
+
 function BeaverHero({ entering }: { readonly entering: boolean }) {
   const ink = '#2A2722';
   const ink7 = '#4A453C';
@@ -326,10 +273,12 @@ function BeaverHero({ entering }: { readonly entering: boolean }) {
       }}
       aria-hidden="true"
     >
+      {/* Limbs pivot where they join the body (coordinates are in the 300x300
+          viewBox), and are painted before the body so the joint stays hidden. */}
       <g
         style={{
-          transformBox: 'fill-box',
-          transformOrigin: '90px 200px',
+          transformBox: 'view-box',
+          transformOrigin: `${TAIL_JOINT.x}px ${TAIL_JOINT.y}px`,
           animation: entering
             ? 'homeBvrTail 2.4s 1200ms ease-in-out infinite'
             : 'homeBvrTail 2.4s ease-in-out infinite',
@@ -351,6 +300,32 @@ function BeaverHero({ entering }: { readonly entering: boolean }) {
         />
       </g>
 
+      <g
+        style={{
+          transformBox: 'view-box',
+          transformOrigin: `${SHOULDER_JOINT.x}px ${SHOULDER_JOINT.y}px`,
+          animation: entering
+            ? 'homeBvrArm 4s 1600ms ease-in-out infinite'
+            : 'homeBvrArm 4s ease-in-out infinite',
+        }}
+      >
+        {/* The upper arm runs on into the torso so no end shows as it swings. */}
+        <path
+          d="M193.5 186.3 L205 170 Q235 150 240 120 Q243 102 232 96 Q220 95 218 115 Q216 140 198 165 L186.5 181.3 Z"
+          fill={body}
+          stroke={ink}
+          strokeWidth={3}
+          strokeLinejoin="round"
+        />
+        <circle cx={236} cy={105} r={11} fill={bodyShade} stroke={ink} strokeWidth={3} />
+        <path
+          d="M240 98 L246 92 M244 105 L252 104 M240 112 L246 118"
+          stroke={ink}
+          strokeWidth={2}
+          strokeLinecap="round"
+        />
+      </g>
+
       <ellipse cx={150} cy={200} rx={70} ry={60} fill={body} stroke={ink} strokeWidth={3.5} />
       <path
         d="M98 210 Q150 245 202 210"
@@ -361,30 +336,6 @@ function BeaverHero({ entering }: { readonly entering: boolean }) {
       />
       <ellipse cx={118} cy={258} rx={14} ry={7} fill={ink7} stroke={ink} strokeWidth={2.6} />
       <ellipse cx={182} cy={258} rx={14} ry={7} fill={ink7} stroke={ink} strokeWidth={2.6} />
-
-      <g
-        style={{
-          transformBox: 'fill-box',
-          transformOrigin: '90% 90%',
-          animation: entering
-            ? 'homeBvrArm 4s 1600ms ease-in-out infinite'
-            : 'homeBvrArm 4s ease-in-out infinite',
-        }}
-      >
-        <path
-          d="M205 170 Q235 150 240 120 Q243 102 232 96 Q220 95 218 115 Q216 140 198 165 Z"
-          fill={body}
-          stroke={ink}
-          strokeWidth={3}
-        />
-        <circle cx={236} cy={105} r={11} fill={bodyShade} stroke={ink} strokeWidth={3} />
-        <path
-          d="M240 98 L246 92 M244 105 L252 104 M240 112 L246 118"
-          stroke={ink}
-          strokeWidth={2}
-          strokeLinecap="round"
-        />
-      </g>
 
       <path
         d="M98 165 Q75 175 72 195 Q70 215 88 220 Q104 218 106 200 Z"
@@ -411,8 +362,26 @@ function BeaverHero({ entering }: { readonly entering: boolean }) {
           fill="none"
           strokeLinecap="round"
         />
-        <rect x={-7} y={20} width={6.5} height={12} rx={1} fill={paper} stroke={ink} strokeWidth={1.8} />
-        <rect x={0.5} y={20} width={6.5} height={12} rx={1} fill={paper} stroke={ink} strokeWidth={1.8} />
+        <rect
+          x={-7}
+          y={20}
+          width={6.5}
+          height={12}
+          rx={1}
+          fill={paper}
+          stroke={ink}
+          strokeWidth={1.8}
+        />
+        <rect
+          x={0.5}
+          y={20}
+          width={6.5}
+          height={12}
+          rx={1}
+          fill={paper}
+          stroke={ink}
+          strokeWidth={1.8}
+        />
         <g className="beaver-eye">
           <circle cx={-22} cy={-10} r={6} fill={ink} />
           <circle cx={-20} cy={-12} r={2} fill={paper} />
@@ -440,137 +409,23 @@ function BeaverHero({ entering }: { readonly entering: boolean }) {
   );
 }
 
-function HomeDaily({
-  done,
-  streak,
-  onPlay,
-}: {
-  readonly done: boolean;
-  readonly streak: number;
-  readonly onPlay: () => void;
-}) {
-  return (
-    <div className="px-5 mt-4">
-      <button
-        type="button"
-        onClick={onPlay}
-        className="relative w-full flex items-center justify-between pl-16 pr-4 py-3.5 rounded-[14px] border-[1.5px] active:scale-[0.99] transition-transform duration-nudge focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ochre-500/60"
-        style={{
-          background: done ? 'var(--paper-100)' : 'var(--paper-200)',
-          borderColor: 'var(--rule-300)',
-          minHeight: 72,
-          opacity: done ? 0.75 : 1,
-          boxShadow:
-            '0 2px 0 rgba(0,0,0,0.04), 0 6px 14px rgba(60,42,20,0.08)',
-          animation: 'homeDailyFloat 4s ease-in-out infinite',
-        }}
-      >
-        <span
-          aria-hidden="true"
-          className="absolute left-0 top-0 bottom-0 rounded-l-[12px]"
-          style={{
-            width: 56,
-            background: done
-              ? 'linear-gradient(135deg, var(--paper-200) 50%, var(--paper-100) 50%)'
-              : 'linear-gradient(135deg, var(--paper-300) 50%, var(--paper-200) 50%)',
-            borderRight: '1.5px dashed var(--rule-300)',
-          }}
-        />
-        <span
-          aria-hidden="true"
-          className="absolute top-1/2 -translate-y-1/2 left-3 w-8 h-8 rounded-full flex items-center justify-center"
-          style={{
-            background: done ? 'var(--sage-500)' : 'var(--clay-500)',
-            boxShadow:
-              'inset 0 -2px 0 rgba(0,0,0,0.15), inset 0 2px 0 rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.15)',
-            color: '#fff',
-          }}
-        >
-          {done ? <CheckIcon className="w-4 h-4" /> : <EnvelopeIcon className="w-4 h-4" />}
-        </span>
-        <span className="text-left">
-          <span className="block font-serif text-[16px] font-semibold text-ink-900">
-            {done ? "Today's puzzle" : 'A puzzle for today!'}
-            {done && <span className="text-sage-700"> ✓</span>}
-          </span>
-          <span className="block font-sans text-[12px] text-ink-700 mt-px">
-            {done ? 'Come back tomorrow' : 'Tap to unwrap · ends at midnight'}
-          </span>
-        </span>
-        {streak > 0 && (
-          <span
-            className="inline-flex items-center gap-1 font-mono text-[10px] font-medium text-ochre-700 shrink-0"
-            style={{
-              background: 'var(--ochre-100)',
-              border: '1px solid var(--ochre-500)',
-              padding: '3px 8px',
-              borderRadius: 99,
-            }}
-          >
-            <FlameIcon className="w-2.5 h-2.5" />
-            {streak}
-          </span>
-        )}
-      </button>
-    </div>
-  );
-}
-
-function CheckIcon({ className }: { readonly className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M5 13l4 4L19 7"
-        stroke="currentColor"
-        strokeWidth={2.4}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function EnvelopeIcon({ className }: { readonly className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect
-        x={5}
-        y={6}
-        width={14}
-        height={13}
-        rx={1.5}
-        stroke="currentColor"
-        strokeWidth={2.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M5 9l7 5 7-5"
-        stroke="currentColor"
-        strokeWidth={2.2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 type TierMotif = 'pond' | 'stream' | 'river' | 'waterfall' | 'lake';
 
 interface TierStop {
   readonly tier: Tier;
-  readonly name: string;
   readonly motif: TierMotif;
   readonly xPct: number;
   readonly y: number;
 }
 
+// Evenly spaced so that on a 360dp-wide phone every pin is fully on screen and
+// no label runs under a neighbouring pin.
 const TIER_STOPS: readonly TierStop[] = [
-  { tier: Tier.Beginner, name: 'Pond', motif: 'pond', xPct: 12.8, y: 30 },
-  { tier: Tier.Intermediate, name: 'Stream', motif: 'stream', xPct: 35.9, y: 80 },
-  { tier: Tier.Advanced, name: 'River', motif: 'river', xPct: 58.9, y: 30 },
-  { tier: Tier.Expert, name: 'Waterfall', motif: 'waterfall', xPct: 78.2, y: 85 },
-  { tier: Tier.Master, name: 'Lake', motif: 'lake', xPct: 95.0, y: 30 },
+  { tier: Tier.Beginner, motif: 'pond', xPct: 12, y: 30 },
+  { tier: Tier.Intermediate, motif: 'stream', xPct: 31, y: 80 },
+  { tier: Tier.Advanced, motif: 'river', xPct: 50, y: 30 },
+  { tier: Tier.Expert, motif: 'waterfall', xPct: 69, y: 85 },
+  { tier: Tier.Master, motif: 'lake', xPct: 88, y: 30 },
 ];
 
 function HomeTierMap({
@@ -612,11 +467,7 @@ function HomeTierMap({
         const max = maxStarsForTier(stop.tier);
         const isCurrent = stop.tier === currentTier;
         const untouched = earned === 0 && !isCurrent;
-        const state: TierVisualState = isCurrent
-          ? 'current'
-          : untouched
-            ? 'locked'
-            : 'unlocked';
+        const state: TierVisualState = isCurrent ? 'current' : untouched ? 'untouched' : 'started';
         return (
           <TierStopPin
             key={stop.tier}
@@ -632,7 +483,8 @@ function HomeTierMap({
   );
 }
 
-type TierVisualState = 'current' | 'unlocked' | 'locked';
+// Every tier is open from the start; an untouched one is only shown quieter.
+type TierVisualState = 'current' | 'started' | 'untouched';
 
 function TierStopPin({
   stop,
@@ -647,17 +499,19 @@ function TierStopPin({
   readonly max: number;
   readonly onPick: () => void;
 }) {
+  const name = TIER_PLACE_NAMES[stop.tier];
   return (
     <button
       type="button"
       onClick={onPick}
       className="absolute flex flex-col items-center active:scale-95 transition-transform duration-nudge focus-visible:outline-none"
       style={{
-        left: `calc(${stop.xPct}% - 28px)`,
+        // Clamped so the first and last pins stay on screen on narrow phones.
+        left: `clamp(10px, calc(${stop.xPct}% - 28px), calc(100% - 66px))`,
         top: stop.y,
         width: 56,
       }}
-      aria-label={`${stop.name} tier, ${earned} of ${max} stars`}
+      aria-label={`${name} tier, ${earned} of ${max} stars`}
     >
       <span aria-hidden="true" className="absolute -inset-2" />
       <span
@@ -669,36 +523,31 @@ function TierStopPin({
           background:
             state === 'current'
               ? 'var(--ochre-500)'
-              : state === 'unlocked'
+              : state === 'started'
                 ? 'var(--sage-500)'
-                : 'var(--paper-200)',
+                : 'var(--paper-300)',
           border: '2px solid var(--ink-900)',
-          boxShadow:
-            '0 4px 0 var(--ink-900), 0 6px 10px rgba(0,0,0,0.12)',
-          animation:
-            state === 'current' ? 'homeTierPulse 2.2s ease-in-out infinite' : undefined,
+          boxShadow: '0 4px 0 var(--ink-900), 0 6px 10px rgba(0,0,0,0.12)',
+          animation: state === 'current' ? 'homeTierPulse 2.2s ease-in-out infinite' : undefined,
         }}
       >
-        {state === 'locked' ? <LockedDoor /> : <TierMotifIcon motif={stop.motif} />}
+        <TierMotifIcon motif={stop.motif} />
       </span>
       <div
         className="mt-1.5 text-center font-serif font-semibold text-[13px] leading-none"
         style={{
-          color: state === 'locked' ? 'var(--ink-500)' : 'var(--ink-900)',
+          color: state === 'untouched' ? 'var(--ink-500)' : 'var(--ink-900)',
         }}
       >
-        {stop.name}
+        {name}
       </div>
       <div
-        className="mt-1 font-mono text-[10px]"
+        className="mt-1 font-mono text-[10px] whitespace-nowrap"
         style={{
-          color:
-            state === 'locked'
-              ? 'var(--ink-500)'
-              : 'var(--ochre-700)',
+          color: state === 'untouched' ? 'var(--ink-500)' : 'var(--ochre-700)',
         }}
       >
-        {state === 'locked' ? 'locked' : `★ ${earned}/${max}`}
+        ★ {earned}/{max}
       </div>
     </button>
   );
@@ -710,15 +559,7 @@ function TierMotifIcon({ motif }: { readonly motif: TierMotif }) {
     case 'pond':
       return (
         <svg viewBox="0 0 32 32" width={size} height={size} fill="none" aria-hidden="true">
-          <ellipse
-            cx={16}
-            cy={20}
-            rx={12}
-            ry={5}
-            fill="#4E6B4A"
-            stroke="#2A2722"
-            strokeWidth={2}
-          />
+          <ellipse cx={16} cy={20} rx={12} ry={5} fill="#4E6B4A" stroke="#2A2722" strokeWidth={2} />
           <path
             d="M10 18 Q16 15 22 18"
             stroke="#FDFBF6"
@@ -778,15 +619,7 @@ function TierMotifIcon({ motif }: { readonly motif: TierMotif }) {
     case 'lake':
       return (
         <svg viewBox="0 0 32 32" width={size} height={size} fill="none" aria-hidden="true">
-          <ellipse
-            cx={16}
-            cy={17}
-            rx={13}
-            ry={9}
-            fill="#4E6B4A"
-            stroke="#2A2722"
-            strokeWidth={2}
-          />
+          <ellipse cx={16} cy={17} rx={13} ry={9} fill="#4E6B4A" stroke="#2A2722" strokeWidth={2} />
           <path
             d="M5 14 Q16 8 27 14"
             stroke="#FDFBF6"
@@ -797,28 +630,4 @@ function TierMotifIcon({ motif }: { readonly motif: TierMotif }) {
         </svg>
       );
   }
-}
-
-function LockedDoor() {
-  return (
-    <svg viewBox="0 0 32 32" width={32} height={32} fill="none" aria-hidden="true">
-      <rect
-        x={9}
-        y={8}
-        width={14}
-        height={18}
-        rx={1.5}
-        fill="#D4A748"
-        stroke="#2A2722"
-        strokeWidth={2}
-      />
-      <path
-        d="M11 12 L21 12 M11 16 L21 16 M11 20 L21 20"
-        stroke="#8B6B1E"
-        strokeWidth={1}
-        opacity={0.6}
-      />
-      <circle cx={19} cy={17} r={1.3} fill="#2A2722" />
-    </svg>
-  );
 }

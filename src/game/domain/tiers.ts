@@ -45,7 +45,7 @@ export const TIER_CONFIGS: readonly TierConfig[] = [
     guessBudget: 3,
     preLockedCells: 0,
     threeStarMaxGuesses: 2,
-    twoStarMaxGuesses: 2,
+    twoStarMaxGuesses: 3,
   },
   {
     tier: Tier.Master,
@@ -54,7 +54,7 @@ export const TIER_CONFIGS: readonly TierConfig[] = [
     guessBudget: 3,
     preLockedCells: 0,
     threeStarMaxGuesses: 2,
-    twoStarMaxGuesses: 2,
+    twoStarMaxGuesses: 3,
   },
 ];
 

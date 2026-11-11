@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { BACK_PRIORITY_OVERLAY } from '../../platform/back';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { ChevronRightIcon, CloseIcon } from './icons';
 
 interface RulesModalProps {
-  readonly onDismiss: () => void;
+  /** `skipped` is true when the first-run tutorial was left before its last page. */
+  readonly onDismiss: (skipped: boolean) => void;
   readonly variant?: 'intro' | 'reference';
 }
 
@@ -31,33 +34,30 @@ const PANELS: readonly Panel[] = [
   {
     eyebrow: 'How to play · 3 of 3',
     title: 'Submit to check.',
-    body: 'Correct marks lock green. Wrong marks clear. A few guesses are all you get — deduce carefully.',
+    body: 'Correct marks lock green. Wrong marks are crossed out for good. A few guesses are all you get — deduce carefully.',
     demo: 'submit',
   },
 ];
 
 export function RulesModal({ onDismiss, variant = 'reference' }: RulesModalProps) {
   if (variant === 'intro') return <RulesIntro onDismiss={onDismiss} />;
-  return <RulesSheet onDismiss={onDismiss} />;
+  return <RulesSheet onDismiss={() => onDismiss(false)} />;
 }
 
-function RulesIntro({ onDismiss }: { readonly onDismiss: () => void }) {
+function RulesIntro({ onDismiss }: { readonly onDismiss: (skipped: boolean) => void }) {
   const [i, setI] = useState(0);
   const panel = PANELS[i]!;
   const atEnd = i === PANELS.length - 1;
+  useBackHandler(() => (i > 0 ? setI(i - 1) : onDismiss(true)), BACK_PRIORITY_OVERLAY);
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-paper-100 flex flex-col"
+      className="overlay-safe fixed inset-0 z-50 bg-paper-100 flex flex-col"
       role="dialog"
       aria-label="How to play"
-      style={{
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
     >
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <div className="w-9" />
+      <div className="px-2 pt-2 pb-2 flex items-center justify-between">
+        <div className="w-16" />
         <div className="flex items-center gap-1.5">
           {PANELS.map((_, j) => (
             <span
@@ -70,8 +70,8 @@ function RulesIntro({ onDismiss }: { readonly onDismiss: () => void }) {
         </div>
         <button
           type="button"
-          onClick={onDismiss}
-          className="font-sans text-[13px] text-ink-500 hover:text-ink-900 px-2"
+          onClick={() => onDismiss(true)}
+          className="w-16 h-11 font-sans text-[13px] text-ink-500 hover:text-ink-900"
         >
           Skip
         </button>
@@ -93,19 +93,19 @@ function RulesIntro({ onDismiss }: { readonly onDismiss: () => void }) {
         </div>
       </div>
 
-      <div className="px-4 pt-4 pb-6 flex items-center justify-between">
+      <div className="px-4 pt-4 pb-5 flex items-center justify-between">
         <button
           type="button"
           onClick={() => setI(Math.max(0, i - 1))}
-          className="font-mono text-[10px] tracking-[0.14em] uppercase text-ink-400 disabled:opacity-30"
+          className="h-11 pr-4 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-400 disabled:opacity-30"
           disabled={i === 0}
         >
           ← Back
         </button>
         <button
           type="button"
-          onClick={() => (atEnd ? onDismiss() : setI(i + 1))}
-          className="h-11 px-5 rounded-full bg-fill-800 text-paper-50 font-sans text-[14px] font-semibold inline-flex items-center gap-2 active:scale-[0.97] transition-transform duration-nudge"
+          onClick={() => (atEnd ? onDismiss(false) : setI(i + 1))}
+          className="h-12 px-6 rounded-full bg-fill-800 text-paper-50 font-sans text-[15px] font-semibold inline-flex items-center gap-2 active:scale-[0.97] transition-transform duration-nudge"
         >
           {atEnd ? 'Got it' : 'Next'}
           {!atEnd && <ChevronRightIcon className="w-3.5 h-3.5" />}
@@ -116,8 +116,14 @@ function RulesIntro({ onDismiss }: { readonly onDismiss: () => void }) {
 }
 
 function RulesSheet({ onDismiss }: { readonly onDismiss: () => void }) {
+  useBackHandler(onDismiss, BACK_PRIORITY_OVERLAY);
   return (
-    <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-label="How to play">
+    <div
+      className="fixed inset-0 z-50 flex items-end"
+      role="dialog"
+      aria-label="How to play"
+      style={{ paddingBottom: 'var(--bottom-reserve)' }}
+    >
       <button
         type="button"
         onClick={onDismiss}
@@ -125,10 +131,9 @@ function RulesSheet({ onDismiss }: { readonly onDismiss: () => void }) {
         className="absolute inset-0 bg-[rgba(20,18,14,0.3)]"
       />
       <div
-        className="relative w-full bg-paper-50 rounded-t-[28px] px-5 pt-2.5"
+        className="relative w-full bg-paper-50 rounded-t-[28px] px-5 pt-2.5 pb-6 overflow-y-auto"
         style={{
-          maxHeight: '80vh',
-          paddingBottom: 'max(28px, env(safe-area-inset-bottom))',
+          maxHeight: '82vh',
           boxShadow: '0 -12px 30px rgba(60,42,20,0.14)',
         }}
       >
@@ -139,7 +144,7 @@ function RulesSheet({ onDismiss }: { readonly onDismiss: () => void }) {
             type="button"
             onClick={onDismiss}
             aria-label="Close"
-            className="w-9 h-9 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center"
+            className="w-11 h-11 -mr-1.5 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center"
           >
             <CloseIcon className="w-4 h-4" />
           </button>
@@ -156,7 +161,12 @@ function RulesSheet({ onDismiss }: { readonly onDismiss: () => void }) {
             {
               n: 3,
               t: 'Submit to check.',
-              d: 'Correct marks lock green. Wrong marks clear.',
+              d: 'Correct marks lock green. Wrong marks are crossed out for good.',
+            },
+            {
+              n: 4,
+              t: 'Rule out cells.',
+              d: 'Hold a cell, or switch to Rule out, to pencil a dash where you think it is empty. Dashes are only your notes.',
             },
           ].map(r => (
             <div key={r.n} className="flex items-start gap-3">
@@ -164,12 +174,8 @@ function RulesSheet({ onDismiss }: { readonly onDismiss: () => void }) {
                 {r.n}
               </div>
               <div className="flex-1">
-                <div className="font-sans text-[15px] font-semibold text-ink-900">
-                  {r.t}
-                </div>
-                <div className="font-sans text-[13px] leading-[1.5] text-ink-500 mt-0.5">
-                  {r.d}
-                </div>
+                <div className="font-sans text-[15px] font-semibold text-ink-900">{r.t}</div>
+                <div className="font-sans text-[13px] leading-[1.5] text-ink-500 mt-0.5">{r.d}</div>
               </div>
             </div>
           ))}
@@ -227,9 +233,7 @@ function DemoGrid({
         gridTemplateColumns: showSums
           ? `${sumSize}px repeat(3, ${size}px)`
           : `repeat(3, ${size}px)`,
-        gridTemplateRows: showSums
-          ? `${sumSize}px repeat(3, ${size}px)`
-          : `repeat(3, ${size}px)`,
+        gridTemplateRows: showSums ? `${sumSize}px repeat(3, ${size}px)` : `repeat(3, ${size}px)`,
         gap,
       }}
     >

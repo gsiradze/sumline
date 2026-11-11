@@ -1,15 +1,16 @@
 interface WordmarkProps {
   readonly size?: number;
+  readonly bold?: boolean;
   readonly className?: string;
 }
 
-export function Wordmark({ size = 40, className }: WordmarkProps) {
+export function Wordmark({ size = 40, bold = false, className }: WordmarkProps) {
   const px = (em: number): number => Math.round(size * em);
   return (
     <span
-      className={`inline-flex items-baseline font-serif font-semibold text-ink-900 select-none ${
-        className ?? ''
-      }`}
+      className={`inline-flex items-baseline font-serif text-ink-900 select-none ${
+        bold ? 'font-bold' : 'font-semibold'
+      } ${className ?? ''}`}
       style={{
         fontSize: size,
         letterSpacing: '-0.02em',

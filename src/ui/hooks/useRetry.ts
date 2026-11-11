@@ -7,28 +7,35 @@ import {
 } from '../../storage/persistence';
 import type { RetryState } from '../../storage/persistence';
 import { adProvider } from '../../storage/ads';
+import type { AdOutcome } from '../../storage/ads';
 import { noteAdShown } from '../../storage/adSession';
-import { adImpression } from '../../telemetry/events';
+import { adResult } from '../../telemetry/events';
 
 const AD_RETRY_GRANT = 2;
 
 export interface UseRetry {
   readonly retry: RetryState;
+  /** False until the stored retry state has loaded; the gate stays inert until then. */
+  readonly hydrated: boolean;
   readonly canFreeRetry: boolean;
   readonly canAdRetry: boolean;
   readonly consumeFreeRetry: () => void;
   readonly consumeAdRetry: () => void;
-  readonly requestAdRetries: () => Promise<boolean>;
+  /** 'granted' banks the retries. 'error' means no ad could be shown. */
+  readonly requestAdRetries: () => Promise<AdOutcome>;
   readonly reset: () => void;
 }
 
 export function useRetry(levelId: number): UseRetry {
   const [retry, setRetry] = useState<RetryState>(defaultRetryState);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void loadRetryState(levelId).then(loaded => {
-      if (!cancelled) setRetry(loaded);
+      if (cancelled) return;
+      setRetry(loaded);
+      setHydrated(true);
     });
     return () => {
       cancelled = true;
@@ -61,10 +68,10 @@ export function useRetry(levelId: number): UseRetry {
     });
   }, [levelId]);
 
-  const requestAdRetries = useCallback(async () => {
+  const requestAdRetries = useCallback(async (): Promise<AdOutcome> => {
     const outcome = await adProvider.showRewardedAd('retry');
-    adImpression('retry', outcome);
-    if (outcome !== 'granted') return false;
+    adResult('retry', outcome);
+    if (outcome !== 'granted') return outcome;
     noteAdShown(Date.now());
     setRetry(prev => {
       const next = {
@@ -74,7 +81,7 @@ export function useRetry(levelId: number): UseRetry {
       void saveRetryState(levelId, next);
       return next;
     });
-    return true;
+    return outcome;
   }, [levelId]);
 
   const reset = useCallback(() => {
@@ -84,6 +91,7 @@ export function useRetry(levelId: number): UseRetry {
 
   return {
     retry,
+    hydrated,
     canFreeRetry: !retry.freeRetryUsed,
     canAdRetry: retry.adRetriesRemaining > 0,
     consumeFreeRetry,

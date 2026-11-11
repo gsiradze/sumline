@@ -7,6 +7,9 @@ bundle `com.narnarigames.sumline`). iOS is deferred — its section is marked _(
 - [ ] Privacy policy URL live (see data-safety.md)
 - [ ] Data safety / privacy nutrition answers submitted (data-safety.md)
 - [ ] Age rating questionnaire: 13+/general audience, declares ads, no unrestricted web access
+- [ ] Target audience: 13 and over only. The mascot makes "appeals to children?" a
+      question reviewers will look at; answer it deliberately. Ads are capped at a
+      parental-guidance content rating in code (`storage/ads.ts`).
 - [ ] Support URL / email
 - [ ] AdMob app linked to the store listing (after first release)
 - [ ] `app-ads.txt` on the developer domain: `google.com, pub-XXXX, DIRECT, f08c47fec0942fa0`
@@ -14,8 +17,9 @@ bundle `com.narnarigames.sumline`). iOS is deferred — its section is marked _(
 ## Android (Play Console)
 - [ ] Feature graphic 1024×500
 - [ ] Phone + 7"/10" tablet screenshots
-- [ ] Closed testing: **20 testers / 14 days** (required for new personal accounts) —
-      start the closed track the moment a build exists
+- [ ] Closed testing: **12 testers opted in for 14 days** (required for new personal
+      accounts; Google lowered this from 20 in December 2024 — confirm the number your
+      Console shows) — start the closed track the moment a build exists
 - [ ] Staged rollout starting at 10%
 - [ ] App Review notes: explain the rewarded-ad gate (hints/retries) so reviewers don't flag it
 

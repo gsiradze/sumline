@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadStats, saveStats } from '../../storage/persistence';
-import { emptyStats, isoDateUTC, recordLoss, recordWin } from '../../game/domain/stats';
+import { emptyStats, isoDateLocal, recordLoss, recordWin } from '../../game/domain/stats';
 import type { LevelWin, Stats } from '../../game/domain/stats';
 
 export interface UseStats {
@@ -28,7 +28,7 @@ export function useStats(): UseStats {
 
   const onWin = (win: LevelWin) => {
     setStats(prev => {
-      const next = recordWin(prev, win, isoDateUTC());
+      const next = recordWin(prev, win, isoDateLocal());
       void saveStats(next);
       return next;
     });
@@ -36,7 +36,7 @@ export function useStats(): UseStats {
 
   const onLoss = () => {
     setStats(prev => {
-      const next = recordLoss(prev, isoDateUTC());
+      const next = recordLoss(prev, isoDateLocal());
       void saveStats(next);
       return next;
     });

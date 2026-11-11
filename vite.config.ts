@@ -1,9 +1,38 @@
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as {
+  version: string;
+};
+
+// Source maps are needed to decode crash stacks but must not ship inside the
+// app (they contain the full source). They are built, then moved out of dist/.
+function stashSourceMaps(): Plugin {
+  return {
+    name: 'stash-source-maps',
+    apply: 'build',
+    closeBundle() {
+      const assets = resolve(__dirname, 'dist/assets');
+      if (!existsSync(assets)) return;
+      const maps = readdirSync(assets).filter(f => f.endsWith('.map'));
+      if (maps.length === 0) return;
+      const target = resolve(__dirname, 'sourcemaps', pkg.version);
+      rmSync(target, { recursive: true, force: true });
+      mkdirSync(target, { recursive: true });
+      for (const file of maps) renameSync(resolve(assets, file), resolve(target, file));
+    },
+  };
+}
 
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [react(), stashSourceMaps()],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   server: {
     port: 8080,
     host: true,
@@ -30,18 +59,13 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
-    sourcemap: true,
+    sourcemap: 'hidden',
     rollupOptions: {
       // Firebase is native-only here (providers are dynamic-imported behind
       // isNative()); the @capacitor-firebase web shims depend on the firebase
       // JS SDK, which we don't ship. Keep it external so the web build never
       // tries to bundle it.
       external: [/^firebase\//],
-      output: {
-        manualChunks: {
-          phaser: ['phaser'],
-        },
-      },
     },
     minify: 'terser',
     terserOptions: {

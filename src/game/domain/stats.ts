@@ -55,11 +55,14 @@ export function recordLoss(stats: Stats, today?: string): Stats {
   };
 }
 
-export function isoDateUTC(date: Date = new Date()): string {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(date.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+function isoDate(y: number, month0: number, d: number): string {
+  return `${y}-${String(month0 + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+// The player's calendar day. A streak is about "did I play today", and today
+// rolls over at local midnight, not at UTC midnight.
+export function isoDateLocal(date: Date = new Date()): string {
+  return isoDate(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function updateStreak(
@@ -87,7 +90,7 @@ function shiftIsoDate(iso: string, days: number): string {
   if (y === undefined || m === undefined || d === undefined) return iso;
   const date = new Date(Date.UTC(y, m - 1, d));
   date.setUTCDate(date.getUTCDate() + days);
-  return isoDateUTC(date);
+  return isoDate(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
 export function winRate(stats: Stats): number {

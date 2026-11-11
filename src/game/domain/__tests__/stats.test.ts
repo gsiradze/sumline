@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyStats, recordLoss, recordWin, winRate } from '../stats';
+import { emptyStats, isoDateLocal, recordLoss, recordWin, winRate } from '../stats';
 import { MAX_GUESS_BUDGET } from '../types';
 
 describe('emptyStats', () => {
@@ -19,14 +19,22 @@ describe('emptyStats', () => {
 
 describe('day streak', () => {
   it('starts streak at 1 on first active day', () => {
-    const s = recordWin(emptyStats(), { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-01');
+    const s = recordWin(
+      emptyStats(),
+      { guessCount: 3, stars: 3, firstCompletion: true },
+      '2026-04-01',
+    );
     expect(s.dayStreak).toBe(1);
     expect(s.bestDayStreak).toBe(1);
     expect(s.lastActiveIsoDate).toBe('2026-04-01');
   });
 
   it('extends streak on consecutive days', () => {
-    let s = recordWin(emptyStats(), { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-01');
+    let s = recordWin(
+      emptyStats(),
+      { guessCount: 3, stars: 3, firstCompletion: true },
+      '2026-04-01',
+    );
     s = recordWin(s, { guessCount: 2, stars: 3, firstCompletion: true }, '2026-04-02');
     s = recordWin(s, { guessCount: 2, stars: 3, firstCompletion: true }, '2026-04-03');
     expect(s.dayStreak).toBe(3);
@@ -34,14 +42,22 @@ describe('day streak', () => {
   });
 
   it('resets streak after a day gap', () => {
-    let s = recordWin(emptyStats(), { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-01');
+    let s = recordWin(
+      emptyStats(),
+      { guessCount: 3, stars: 3, firstCompletion: true },
+      '2026-04-01',
+    );
     s = recordWin(s, { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-03');
     expect(s.dayStreak).toBe(1);
     expect(s.bestDayStreak).toBe(1);
   });
 
   it('preserves bestDayStreak when current streak drops', () => {
-    let s = recordWin(emptyStats(), { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-01');
+    let s = recordWin(
+      emptyStats(),
+      { guessCount: 3, stars: 3, firstCompletion: true },
+      '2026-04-01',
+    );
     s = recordWin(s, { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-02');
     s = recordWin(s, { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-04');
     expect(s.dayStreak).toBe(1);
@@ -49,7 +65,11 @@ describe('day streak', () => {
   });
 
   it('does not change streak for multiple plays on the same day', () => {
-    let s = recordWin(emptyStats(), { guessCount: 3, stars: 3, firstCompletion: true }, '2026-04-01');
+    let s = recordWin(
+      emptyStats(),
+      { guessCount: 3, stars: 3, firstCompletion: true },
+      '2026-04-01',
+    );
     s = recordWin(s, { guessCount: 2, stars: 3, firstCompletion: true }, '2026-04-01');
     expect(s.dayStreak).toBe(1);
   });
@@ -106,5 +126,29 @@ describe('winRate', () => {
     s = recordLoss(s);
     s = recordWin(s, { guessCount: 2, stars: 3, firstCompletion: true });
     expect(winRate(s)).toBeCloseTo(2 / 3);
+  });
+});
+
+describe('isoDateLocal', () => {
+  it('formats the local calendar day, zero-padded', () => {
+    expect(isoDateLocal(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+    expect(isoDateLocal(new Date(2026, 10, 11, 0, 1))).toBe('2026-11-11');
+  });
+
+  it('keeps a streak for evening play on consecutive local days', () => {
+    // 5 pm, 3 pm, 5 pm local on three consecutive days. With UTC keys and a
+    // UTC-8 clock these collapsed to Tue, Tue, Thu and broke the streak.
+    const win = { guessCount: 2, stars: 3, firstCompletion: true } as const;
+    let s = recordWin(emptyStats(), win, isoDateLocal(new Date(2026, 3, 6, 17, 0)));
+    s = recordWin(s, win, isoDateLocal(new Date(2026, 3, 7, 15, 0)));
+    s = recordWin(s, win, isoDateLocal(new Date(2026, 3, 8, 17, 0)));
+    expect(s.dayStreak).toBe(3);
+  });
+
+  it('continues a streak across a month boundary', () => {
+    const win = { guessCount: 2, stars: 3, firstCompletion: true } as const;
+    let s = recordWin(emptyStats(), win, isoDateLocal(new Date(2026, 0, 31, 12, 0)));
+    s = recordWin(s, win, isoDateLocal(new Date(2026, 1, 1, 12, 0)));
+    expect(s.dayStreak).toBe(2);
   });
 });

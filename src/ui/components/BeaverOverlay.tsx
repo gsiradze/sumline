@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CELL_COUNT, GRID_SIZE, GameOutcome } from '../../game/domain/types';
-import { layout } from '../../game/rendering/tokens';
+import { cellOrigin, layout } from './boardLayout';
 import type { ActiveGameState } from '../../game/domain/game-state';
 
 interface BeaverOverlayProps {
@@ -9,10 +9,6 @@ interface BeaverOverlayProps {
 }
 
 type Pose = 'a' | 'b' | 'c';
-
-const GRID_WIDTH =
-  GRID_SIZE * layout.cellSize + (GRID_SIZE - 1) * layout.cellGap;
-const ORIGIN_X = Math.round((layout.canvasWidth - GRID_WIDTH) / 2);
 
 function poseFor(levelId: number, r: number, c: number): Pose {
   const h = Math.abs(levelId * 11 + r * 7 + c * 3) % 3;
@@ -50,7 +46,7 @@ export function BeaverOverlay({ state, levelId }: BeaverOverlayProps) {
   return (
     <svg
       className="absolute inset-0 w-full h-full pointer-events-none"
-      viewBox={`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`}
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
       preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
     >
@@ -58,13 +54,9 @@ export function BeaverOverlay({ state, levelId }: BeaverOverlayProps) {
         if (!state.lockedFilled[i]) return null;
         const r = Math.floor(i / GRID_SIZE);
         const c = i % GRID_SIZE;
-        const x = ORIGIN_X + c * (layout.cellSize + layout.cellGap);
-        const y = layout.gridOriginY + r * (layout.cellSize + layout.cellGap);
+        const { x, y } = cellOrigin(i);
         return (
-          <g
-            key={i}
-            transform={`translate(${x} ${y}) scale(${layout.cellSize / 100})`}
-          >
+          <g key={i} transform={`translate(${x} ${y}) scale(${layout.cellSize / 100})`}>
             <Beaver
               pose={poseFor(levelId, r, c)}
               settleIn={justLocked.has(i)}
@@ -126,10 +118,7 @@ function BeaverBody({ pose, blink }: { readonly pose: Pose; readonly blink: bool
 
   return (
     <g>
-      <g
-        transform={`rotate(${tailRot} 60 62)`}
-        style={{ transformBox: 'fill-box' }}
-      >
+      <g transform={`rotate(${tailRot} 60 62)`} style={{ transformBox: 'fill-box' }}>
         <path
           d="M58 58 Q82 54 86 64 Q82 76 58 72 Z"
           fill={COLORS.ink7}
@@ -256,12 +245,7 @@ function Prop({ pose }: { readonly pose: Pose }) {
   if (pose === 'a') {
     return (
       <g>
-        <g
-          stroke={COLORS.ink}
-          strokeWidth={2.4}
-          strokeLinecap="round"
-          fill="none"
-        >
+        <g stroke={COLORS.ink} strokeWidth={2.4} strokeLinecap="round" fill="none">
           <path d="M32 72 L68 72" />
           <path d="M40 72 L36 66" />
           <path d="M52 72 L56 66" />
@@ -325,14 +309,7 @@ function ExclamationMark({ delay }: { readonly delay: number }) {
         stroke={COLORS.ink}
         strokeWidth={1.6}
       />
-      <circle
-        cx={0}
-        cy={3}
-        r={1.8}
-        fill={COLORS.bodyShade}
-        stroke={COLORS.ink}
-        strokeWidth={1.6}
-      />
+      <circle cx={0} cy={3} r={1.8} fill={COLORS.bodyShade} stroke={COLORS.ink} strokeWidth={1.6} />
     </g>
   );
 }

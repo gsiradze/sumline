@@ -34,6 +34,7 @@ function makeState(
     currentMarks: new Array<Cell>(CELL_COUNT).fill(0),
     lockedFilled: new Array<boolean>(CELL_COUNT).fill(false),
     lockedEmpty: new Array<boolean>(CELL_COUNT).fill(false),
+    emptyNotes: new Array<boolean>(CELL_COUNT).fill(false),
     outcome,
     hintsUsed: 0,
   };
@@ -61,39 +62,47 @@ describe('feedbackToBlock', () => {
 });
 
 describe('generateShareText', () => {
-  it('includes the level id, the N/budget header, and the URL', () => {
+  it('leads with the game name, level number and N/budget', () => {
     const state = makeState([allGreen()], GameOutcome.Won, 6);
-    const text = generateShareText(state, { levelId: 47 });
-    expect(text).toContain('Grid L47');
-    expect(text).toContain('1/6');
-    expect(text).toContain('grid.game/L47');
+    const text = generateShareText(state, { levelNumber: 47 });
+    expect(text.startsWith('Sumline #47 1/6')).toBe(true);
   });
 
   it('uses the state budget in the header', () => {
     const state = makeState([allGreen()], GameOutcome.Won, 4);
-    const text = generateShareText(state, { levelId: 200 });
+    const text = generateShareText(state, { levelNumber: 200 });
     expect(text).toContain('1/4');
   });
 
   it('uses X/budget when the game was lost', () => {
     const state = makeState(
-      [mixedFeedback([0, 1]), mixedFeedback([0, 1, 2]), mixedFeedback([0, 1, 2, 3]),
-        mixedFeedback([0, 1, 2, 3]), mixedFeedback([0, 1, 2, 3]), mixedFeedback([0, 1, 2, 3])],
+      [
+        mixedFeedback([0, 1]),
+        mixedFeedback([0, 1, 2]),
+        mixedFeedback([0, 1, 2, 3]),
+        mixedFeedback([0, 1, 2, 3]),
+        mixedFeedback([0, 1, 2, 3]),
+        mixedFeedback([0, 1, 2, 3]),
+      ],
       GameOutcome.Lost,
       6,
     );
-    const text = generateShareText(state, { levelId: 42 });
+    const text = generateShareText(state, { levelNumber: 42 });
     expect(text).toContain('X/6');
   });
 
-  it('respects a custom URL override and title prefix', () => {
+  it('shows earned stars in the header', () => {
+    const state = makeState([allGreen()], GameOutcome.Won, 5);
+    const text = generateShareText(state, { levelNumber: 3, stars: 2 });
+    expect(text).toContain('Sumline #3 · ★★☆ 1/5');
+  });
+
+  it('ends with the link when one is given and never invents one', () => {
     const state = makeState([allGreen()], GameOutcome.Won, 6);
-    const text = generateShareText(state, {
-      levelId: 1,
-      url: 'example.com/x',
-      titlePrefix: 'Grid #',
-    });
-    expect(text).toContain('example.com/x');
-    expect(text).toContain('Grid #1');
+    const withUrl = generateShareText(state, { levelNumber: 1, url: 'https://example.com/x' });
+    expect(withUrl.endsWith('https://example.com/x')).toBe(true);
+    const without = generateShareText(state, { levelNumber: 1 });
+    expect(without).not.toMatch(/https?:|\.game|\.com/);
+    expect(without.endsWith('🟩')).toBe(true);
   });
 });

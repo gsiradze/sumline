@@ -9,13 +9,13 @@ interface SplashProps {
 // A 6-dot ink-row that resolves into a tidy pattern mirroring the mark mechanic.
 const ROW_PATTERN = [0, 1, 1, 0, 1, 0];
 
-export function Splash({ durationMs = 1400, onDone }: SplashProps) {
+export function Splash({ durationMs = 900, onDone }: SplashProps) {
   const [stage, setStage] = useState(0); // 0: start, 1: cells in, 2: wordmark in, 3: fading out
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStage(1), 120);
-    const t2 = setTimeout(() => setStage(2), 620);
-    const t3 = setTimeout(() => setStage(3), Math.max(900, durationMs - 260));
+    const t1 = setTimeout(() => setStage(1), 60);
+    const t2 = setTimeout(() => setStage(2), 300);
+    const t3 = setTimeout(() => setStage(3), Math.max(500, durationMs - 260));
     const t4 = setTimeout(() => onDone?.(), durationMs);
     return () => {
       clearTimeout(t1);
@@ -36,12 +36,11 @@ export function Splash({ durationMs = 1400, onDone }: SplashProps) {
         {ROW_PATTERN.map((v, i) => (
           <div
             key={i}
-            className={`w-[26px] h-[26px] rounded-[4px] border border-rule-200 transition-all duration-[480ms] ease-out`}
+            className={`w-[26px] h-[26px] rounded-[4px] border border-rule-200 transition-all duration-[320ms] ease-out`}
             style={{
               background: v && stage >= 1 ? 'var(--ink-fill-800)' : 'var(--paper-50)',
-              boxShadow:
-                v && stage >= 1 ? 'inset 0 1px 2px rgba(20,24,40,0.35)' : 'none',
-              transitionDelay: `${i * 55}ms`,
+              boxShadow: v && stage >= 1 ? 'inset 0 1px 2px rgba(20,24,40,0.35)' : 'none',
+              transitionDelay: `${i * 30}ms`,
               transform: stage === 0 ? 'scale(0.8)' : 'scale(1)',
               opacity: stage === 0 ? 0 : 1,
             }}
@@ -49,7 +48,7 @@ export function Splash({ durationMs = 1400, onDone }: SplashProps) {
         ))}
       </div>
       <div
-        className="transition-all duration-[420ms] ease-out"
+        className="transition-all duration-[300ms] ease-out"
         style={{
           opacity: stage >= 2 ? 1 : 0,
           transform: stage >= 2 ? 'translateY(0)' : 'translateY(8px)',
@@ -57,16 +56,11 @@ export function Splash({ durationMs = 1400, onDone }: SplashProps) {
       >
         <Wordmark size={52} />
       </div>
-      <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500 transition-opacity duration-[420ms] ease-out"
+      <div
+        className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500 transition-opacity duration-[300ms] ease-out"
         style={{ opacity: stage >= 2 ? 1 : 0 }}
       >
-        Daily deduction
-      </div>
-      <div
-        className="absolute bottom-16 font-mono text-[11px] tracking-[0.14em] uppercase text-ink-400"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        v 0.1
+        Deduction puzzles
       </div>
     </div>
   );

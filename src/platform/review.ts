@@ -4,11 +4,9 @@ import {
   type ReviewPolicyConfig,
   type ReviewPolicyInput,
 } from '../game/domain/reviewPolicy';
+import { APP_VERSION } from '../config/version';
 import { loadJson, saveJson } from '../storage/persistence';
 import { isNative } from './native';
-
-// Bump on each store release so the prompt can fire again for that version.
-const APP_VERSION = '0.1.0';
 
 const KEY = 'review:v1';
 
@@ -16,22 +14,24 @@ interface ReviewRecord {
   readonly lastPromptVersion: string | null;
 }
 
+/** Resolves true when a review prompt was requested, so the caller can hold back an ad. */
 export async function maybeRequestReview(
   input: Omit<ReviewPolicyInput, 'lastPromptVersion' | 'currentVersion'>,
   config?: ReviewPolicyConfig,
-): Promise<void> {
+): Promise<boolean> {
   const record = await loadJson<ReviewRecord>(KEY, { lastPromptVersion: null });
   const full: ReviewPolicyInput = {
     ...input,
     lastPromptVersion: record.lastPromptVersion,
     currentVersion: APP_VERSION,
   };
-  if (!shouldRequestReview(full, config)) return;
+  if (!shouldRequestReview(full, config)) return false;
   await saveJson(KEY, { lastPromptVersion: APP_VERSION });
-  if (!isNative()) return;
+  if (!isNative()) return false;
   try {
     await InAppReview.requestReview();
+    return true;
   } catch {
-    // non-fatal
+    return false;
   }
 }

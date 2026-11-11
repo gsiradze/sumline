@@ -5,16 +5,15 @@ import type { AnalyticsEvent, AnalyticsProvider } from './analytics';
    interface. Native only — registered in main.tsx behind isNative(). */
 export class FirebaseAnalyticsProvider implements AnalyticsProvider {
   async init(): Promise<void> {
-    try {
-      await FirebaseAnalytics.setEnabled({ enabled: true });
-    } catch {
-      // non-fatal
-    }
+    // Collection is switched on by setConsent, never unconditionally here.
   }
 
   track(event: AnalyticsEvent): void {
     const { kind, ...params } = event;
-    void FirebaseAnalytics.logEvent({ name: kind, params: params as Record<string, unknown> }).catch(() => {});
+    void FirebaseAnalytics.logEvent({
+      name: kind,
+      params: params as Record<string, unknown>,
+    }).catch(() => {});
   }
 
   setUser(id: string | null): void {

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sumline</string>
+    <string name="title_activity_main">Sumline</string>
+    <string name="package_name">com.narnarigames.sumline</string>
+    <string name="custom_url_scheme">com.narnarigames.sumline</string>
+</resources>

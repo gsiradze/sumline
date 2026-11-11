@@ -7,9 +7,11 @@ import {
   guessesUsed,
   initialGameState,
   isCellLocked,
+  isOverMarkCap,
   markedCount,
   submitGuess,
   toggleMark,
+  toggleNote,
 } from '../game-state';
 import { CELL_COUNT, GRID_SIZE, GameOutcome } from '../types';
 import type { Cell, Puzzle } from '../types';
@@ -66,6 +68,142 @@ describe('initialGameState', () => {
   });
 });
 
+describe('initialGameState with pre-solved cells', () => {
+  const idx = (r: number, c: number): number => r * GRID_SIZE + c;
+
+  it('rules out the rest of a column that a pre-solved row already completes', () => {
+    // Row 1 is full except its last cell. Column 0 sums to 1, and that one
+    // filled cell is the pre-solved (1,0), so the rest of column 0 is empty.
+    const p = makePuzzle([
+      idx(1, 0),
+      idx(1, 1),
+      idx(1, 2),
+      idx(1, 3),
+      idx(1, 4),
+      idx(0, 1),
+      idx(2, 1),
+      idx(3, 2),
+      idx(4, 2),
+      idx(5, 3),
+    ]);
+    expect(p.colSums[0]).toBe(1);
+    const row1 = [0, 1, 2, 3, 4, 5].map(c => idx(1, c));
+    const s = initialGameState({ puzzle: p, guessBudget: 5, preLockedCells: row1 });
+
+    for (const r of [0, 2, 3, 4, 5]) {
+      expect(s.lockedEmpty[idx(r, 0)], `(${r},0) should start ruled out`).toBe(true);
+    }
+    // Column 1 sums to 3 and has only one filled cell found: still open.
+    expect(isCellLocked(s, idx(0, 1))).toBe(false);
+    expect(isCellLocked(s, idx(2, 1))).toBe(false);
+  });
+
+  it('never locks a cell against the solution and keeps marks in sync', () => {
+    const p = ambiguousPuzzle();
+    const s = initialGameState({ puzzle: p, guessBudget: 5, preLockedCells: [0, 1, 2, 3, 4, 5] });
+    for (let i = 0; i < CELL_COUNT; i++) {
+      if (s.lockedFilled[i]) {
+        expect(p.solution[i]).toBe(1);
+        expect(s.currentMarks[i]).toBe(1);
+      }
+      if (s.lockedEmpty[i]) {
+        expect(p.solution[i]).toBe(0);
+        expect(s.currentMarks[i]).toBe(0);
+      }
+    }
+    expect(s.emptyNotes.every(n => n === false)).toBe(true);
+  });
+
+  it('does not rule anything out from sums alone', () => {
+    const p = makePuzzle([idx(0, 0), idx(1, 1)]);
+    const s = initialGameState({ puzzle: p, guessBudget: 5, preLockedCells: [idx(2, 2)] });
+    expect(s.lockedEmpty.filter(Boolean)).toHaveLength(1);
+    expect(s.lockedFilled.some(Boolean)).toBe(false);
+  });
+});
+
+describe('toggleNote', () => {
+  it('pencils and erases an empty note without touching the guess', () => {
+    const s0 = initialGameState({ puzzle: makePuzzle([0, 7]), guessBudget: 6 });
+    const s1 = toggleNote(s0, 3);
+    expect(s1.emptyNotes[3]).toBe(true);
+    expect(markedCount(s1)).toBe(0);
+    const s2 = toggleNote(s1, 3);
+    expect(s2.emptyNotes[3]).toBe(false);
+  });
+
+  it('replaces a mark with a note, and a mark replaces a note', () => {
+    let s = initialGameState({ puzzle: makePuzzle([0, 7]), guessBudget: 6 });
+    s = toggleMark(s, 3);
+    s = toggleNote(s, 3);
+    expect(s.currentMarks[3]).toBe(0);
+    expect(s.emptyNotes[3]).toBe(true);
+    s = toggleMark(s, 3);
+    expect(s.currentMarks[3]).toBe(1);
+    expect(s.emptyNotes[3]).toBe(false);
+  });
+
+  it('keeps the note when the mark cap blocks marking that cell', () => {
+    let s = initialGameState({ puzzle: makePuzzle([0, 7]), guessBudget: 6 });
+    s = toggleNote(s, 5);
+    s = toggleMark(s, 3);
+    s = toggleMark(s, 4);
+    const blocked = toggleMark(s, 5);
+    expect(blocked).toBe(s);
+    expect(blocked.emptyNotes[5]).toBe(true);
+  });
+
+  it('is a no-op on locked cells and after the game ends', () => {
+    const s = initialGameState({ puzzle: makePuzzle([0]), guessBudget: 6, preLockedCells: [1] });
+    expect(toggleNote(s, 1)).toBe(s);
+    expect(toggleNote(s, -1)).toBe(s);
+    const ended = { ...s, outcome: GameOutcome.Lost };
+    expect(toggleNote(ended, 4)).toBe(ended);
+  });
+
+  it('is not part of a guess: a noted cell is submitted as unmarked', () => {
+    let s = initialGameState({ puzzle: makePuzzle([0]), guessBudget: 6 });
+    s = toggleNote(s, 9);
+    s = toggleMark(s, 0);
+    s = submitGuess(s);
+    expect(s.outcome).toBe(GameOutcome.Won);
+    expect(s.guesses[0]?.[9]).toBe(0);
+  });
+
+  it('drops notes on cells that get locked by a guess or a hint', () => {
+    // Row 0 holds a single filled cell. Finding it rules out the rest of row 0.
+    const p = makePuzzle([0, 7, 14]);
+    let s = initialGameState({ puzzle: p, guessBudget: 6 });
+    s = toggleNote(s, 3);
+    s = toggleNote(s, 20);
+    s = toggleMark(s, 0);
+    s = submitGuess(s);
+    expect(s.lockedEmpty[3]).toBe(true);
+    expect(s.emptyNotes[3]).toBe(false);
+    expect(s.emptyNotes[20]).toBe(true);
+    s = applyHint(s, [20]);
+    expect(s.emptyNotes[20]).toBe(false);
+  });
+});
+
+describe('mark cap after a hint', () => {
+  it('flags the state and refuses the guess until a mark is removed', () => {
+    const p = makePuzzle([0, 7]);
+    let s = initialGameState({ puzzle: p, guessBudget: 6 });
+    s = toggleMark(s, 20);
+    s = toggleMark(s, 21);
+    expect(isOverMarkCap(s)).toBe(false);
+    s = applyHint(s, [0]);
+    expect(markedCount(s)).toBe(3);
+    expect(isOverMarkCap(s)).toBe(true);
+    expect(canSubmit(s)).toBe(false);
+    expect(submitGuess(s)).toBe(s);
+    s = toggleMark(s, 20);
+    expect(isOverMarkCap(s)).toBe(false);
+    expect(canSubmit(s)).toBe(true);
+  });
+});
+
 describe('toggleMark', () => {
   it('flips the cell between 0 and 1 on toggle', () => {
     const s = initialGameState({ puzzle: makePuzzle([0]), guessBudget: 6 });
@@ -118,7 +256,7 @@ describe('submitGuess', () => {
     expect(s.lockedEmpty[0]).toBe(false);
   });
 
-  it('does not lock unmarked cells without any earned info — only the player\'s marks get definitive feedback', () => {
+  it("does not lock unmarked cells without any earned info — only the player's marks get definitive feedback", () => {
     const p = ambiguousPuzzle();
     let s = initialGameState({ puzzle: p, guessBudget: 6 });
     s = submitGuess(s); // submit with zero marks
@@ -217,8 +355,18 @@ describe('submitGuess', () => {
     // (3,1), (4,1), (5,1) — 16 marks, 3 of them wrong.
     const marks: number[] = [
       idx(0, 1),
-      idx(1, 0), idx(1, 1), idx(1, 2), idx(1, 3), idx(1, 4), idx(1, 5),
-      idx(2, 0), idx(2, 1), idx(2, 2), idx(2, 3), idx(2, 4), idx(2, 5),
+      idx(1, 0),
+      idx(1, 1),
+      idx(1, 2),
+      idx(1, 3),
+      idx(1, 4),
+      idx(1, 5),
+      idx(2, 0),
+      idx(2, 1),
+      idx(2, 2),
+      idx(2, 3),
+      idx(2, 4),
+      idx(2, 5),
       idx(3, 1),
       idx(4, 1),
       idx(5, 1),
@@ -236,7 +384,7 @@ describe('applyHint', () => {
   it('locks a filled cell to lockedFilled and marks it', () => {
     const p = makePuzzle([0]);
     const s = initialGameState({ puzzle: p, guessBudget: 6 });
-    const after = applyHint(s, 0);
+    const after = applyHint(s, [0]);
     expect(after.lockedFilled[0]).toBe(true);
     expect(after.currentMarks[0]).toBe(1);
     expect(after.hintsUsed).toBe(1);
@@ -245,7 +393,7 @@ describe('applyHint', () => {
   it('locks an empty cell to lockedEmpty', () => {
     const p = makePuzzle([0]);
     const s = initialGameState({ puzzle: p, guessBudget: 6 });
-    const after = applyHint(s, 5);
+    const after = applyHint(s, [5]);
     expect(after.lockedEmpty[5]).toBe(true);
     expect(after.hintsUsed).toBe(1);
   });
@@ -253,8 +401,8 @@ describe('applyHint', () => {
   it('is a no-op on already-locked cells', () => {
     const p = makePuzzle([0]);
     const s = initialGameState({ puzzle: p, guessBudget: 6 });
-    const after = applyHint(s, 0);
-    const again = applyHint(after, 0);
+    const after = applyHint(s, [0]);
+    const again = applyHint(after, [0]);
     expect(again).toBe(after);
   });
 
@@ -262,7 +410,32 @@ describe('applyHint', () => {
     const p = makePuzzle([0]);
     const base = initialGameState({ puzzle: p, guessBudget: 6 });
     const ended = { ...base, outcome: GameOutcome.Won };
-    expect(applyHint(ended, 0)).toBe(ended);
+    expect(applyHint(ended, [0])).toBe(ended);
+  });
+
+  it('reveals a whole line as one hint, skipping cells that are already known', () => {
+    const p = makePuzzle([0, 2, 7, 14]);
+    const start = initialGameState({ puzzle: p, guessBudget: 6, preLockedCells: [1] });
+    const row0 = [0, 1, 2, 3, 4, 5];
+    const after = applyHint(start, row0);
+    expect(after.hintsUsed).toBe(1);
+    expect(row0.map(i => after.lockedFilled[i])).toEqual([true, false, true, false, false, false]);
+    expect(row0.every(i => isCellLocked(after, i))).toBe(true);
+    expect(after.currentMarks[0]).toBe(1);
+    expect(after.currentMarks[2]).toBe(1);
+  });
+
+  it('then rules out the lines the revealed cells complete', () => {
+    // Column 0 holds a single filled cell, at the top.
+    const p = makePuzzle([0, 7, 8]);
+    const after = applyHint(initialGameState({ puzzle: p, guessBudget: 6 }), [0, 1, 2, 3, 4, 5]);
+    for (const i of [6, 12, 18, 24, 30]) expect(after.lockedEmpty[i], `cell ${i}`).toBe(true);
+  });
+
+  it('ignores cell numbers that are not on the board', () => {
+    const s = initialGameState({ puzzle: makePuzzle([0]), guessBudget: 6 });
+    expect(applyHint(s, [-1, 36, 1.5])).toBe(s);
+    expect(applyHint(s, [])).toBe(s);
   });
 });
 
@@ -304,7 +477,7 @@ describe('helpers', () => {
     expect(markedCount(s)).toBe(2);
   });
 
-  it('toggleMark refuses new marks past the puzzle\'s filled-cell count', () => {
+  it("toggleMark refuses new marks past the puzzle's filled-cell count", () => {
     const p = makePuzzle([0, 7]); // 2 filled
     let s = initialGameState({ puzzle: p, guessBudget: 6 });
     s = toggleMark(s, 3);

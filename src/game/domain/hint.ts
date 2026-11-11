@@ -1,69 +1,64 @@
-import { CELL_COUNT, GRID_SIZE } from './types';
+import { GRID_SIZE } from './types';
 import type { ActiveGameState } from './game-state';
 
-export function findHintCell(state: ActiveGameState): number | null {
-  const solution = state.puzzle.solution;
-  const rowSums = state.puzzle.rowSums;
-  const colSums = state.puzzle.colSums;
-
-  const rowFilled = new Array<number>(GRID_SIZE).fill(0);
-  const rowEmpty = new Array<number>(GRID_SIZE).fill(0);
-  const colFilled = new Array<number>(GRID_SIZE).fill(0);
-  const colEmpty = new Array<number>(GRID_SIZE).fill(0);
-
-  for (let i = 0; i < CELL_COUNT; i++) {
-    const r = Math.floor(i / GRID_SIZE);
-    const c = i % GRID_SIZE;
-    if (state.lockedFilled[i]) {
-      rowFilled[r]!++;
-      colFilled[c]!++;
-    } else if (state.lockedEmpty[i]) {
-      rowEmpty[r]!++;
-      colEmpty[c]!++;
-    }
-  }
-
-  const candidates: number[] = [];
-  for (let i = 0; i < CELL_COUNT; i++) {
-    if (state.lockedFilled[i] || state.lockedEmpty[i]) continue;
-    const r = Math.floor(i / GRID_SIZE);
-    const c = i % GRID_SIZE;
-    const rowUnknownsForFill = GRID_SIZE - rowFilled[r]! - rowEmpty[r]!;
-    const rowStillNeeded = rowSums[r]! - rowFilled[r]!;
-    const colUnknownsForFill = GRID_SIZE - colFilled[c]! - colEmpty[c]!;
-    const colStillNeeded = colSums[c]! - colFilled[c]!;
-
-    const rowForcesFilled = rowStillNeeded === rowUnknownsForFill && rowUnknownsForFill > 0;
-    const rowForcesEmpty = rowStillNeeded === 0 && rowUnknownsForFill > 0;
-    const colForcesFilled = colStillNeeded === colUnknownsForFill && colUnknownsForFill > 0;
-    const colForcesEmpty = colStillNeeded === 0 && colUnknownsForFill > 0;
-
-    if (rowForcesFilled || rowForcesEmpty || colForcesFilled || colForcesEmpty) {
-      return i;
-    }
-    candidates.push(i);
-  }
-
-  if (candidates.length === 0) return null;
-
-  let bestIdx = candidates[0]!;
-  let bestScore = -Infinity;
-  for (const i of candidates) {
-    const r = Math.floor(i / GRID_SIZE);
-    const c = i % GRID_SIZE;
-    const rowScore = extremity(rowSums[r]!);
-    const colScore = extremity(colSums[c]!);
-    const revealFilled = solution[i] === 1 ? 2 : 1;
-    const score = rowScore + colScore + revealFilled;
-    if (score > bestScore) {
-      bestScore = score;
-      bestIdx = i;
-    }
-  }
-  return bestIdx;
+export enum LineAxis {
+  Row = 'row',
+  Column = 'column',
 }
 
-function extremity(sum: number): number {
-  const mid = GRID_SIZE / 2;
-  return Math.abs(sum - mid);
+export interface HintLine {
+  /** 0–5 are the rows from the top, 6–11 the columns from the left. */
+  readonly id: number;
+  readonly axis: LineAxis;
+  readonly index: number;
+  readonly cells: readonly number[];
+}
+
+export const LINE_COUNT = GRID_SIZE * 2;
+
+export function hintLine(id: number): HintLine | null {
+  if (!Number.isInteger(id) || id < 0 || id >= LINE_COUNT) return null;
+  const axis = id < GRID_SIZE ? LineAxis.Row : LineAxis.Column;
+  const index = id % GRID_SIZE;
+  const cells: number[] = [];
+  for (let k = 0; k < GRID_SIZE; k++) {
+    cells.push(axis === LineAxis.Row ? index * GRID_SIZE + k : k * GRID_SIZE + index);
+  }
+  return { id, axis, index, cells };
+}
+
+function choose(n: number, k: number): number {
+  if (k < 0 || k > n) return 0;
+  let result = 1;
+  for (let i = 1; i <= k; i++) result = (result * (n - k + i)) / i;
+  return Math.round(result);
+}
+
+/**
+ * The row or column a hint reveals: the one whose open cells could still be
+ * arranged in the most ways, so its answer tells the player the most. Null
+ * when nothing is left to reveal.
+ */
+export function findHintLine(state: ActiveGameState): HintLine | null {
+  let best: HintLine | null = null;
+  let bestWays = -1;
+  let bestOpen = -1;
+  for (let id = 0; id < LINE_COUNT; id++) {
+    const line = hintLine(id)!;
+    let open = 0;
+    let found = 0;
+    for (const i of line.cells) {
+      if (state.lockedFilled[i]) found++;
+      else if (!state.lockedEmpty[i]) open++;
+    }
+    if (open === 0) continue;
+    const sums = line.axis === LineAxis.Row ? state.puzzle.rowSums : state.puzzle.colSums;
+    const ways = choose(open, (sums[line.index] ?? 0) - found);
+    if (ways > bestWays || (ways === bestWays && open > bestOpen)) {
+      best = line;
+      bestWays = ways;
+      bestOpen = open;
+    }
+  }
+  return best;
 }

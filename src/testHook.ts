@@ -7,6 +7,7 @@ interface NavAPI {
 
 interface GameAPI {
   readonly tapCell: (index: number) => void;
+  readonly noteCell: (index: number) => void;
   readonly submit: () => void;
   readonly restart: () => void;
   readonly getState: () => ActiveGameState | null;
@@ -16,6 +17,7 @@ interface GridTestAPI {
   readonly openLevel: (id: number) => void;
   readonly backToHome: () => void;
   readonly tapCell: (index: number) => void;
+  readonly noteCell: (index: number) => void;
   readonly submit: () => void;
   readonly restart: () => void;
   readonly getState: () => ActiveGameState | null;
@@ -36,6 +38,7 @@ function publish(): void {
     openLevel: id => nav?.openLevel(id),
     backToHome: () => nav?.backToHome(),
     tapCell: i => game?.tapCell(i),
+    noteCell: i => game?.noteCell(i),
     submit: () => game?.submit(),
     restart: () => game?.restart(),
     getState: () => game?.getState() ?? null,

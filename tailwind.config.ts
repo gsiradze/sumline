@@ -52,7 +52,13 @@ const config: Config = {
         },
       },
       fontFamily: {
-        serif: ['Fraunces', 'Source Serif 4', 'Georgia', 'serif'],
+        // `font-serif` marks display type. It was designed as Fraunces, but the
+        // old stack was invalid CSS (an unquoted family ending in a digit), so the
+        // browser dropped it and display type has always rendered in Geist. This
+        // makes the shipped look explicit. To switch to the serif design, set the
+        // stack to ['Fraunces', 'Georgia', 'serif'] and import the Fraunces
+        // weights 500-700 in src/main.tsx.
+        serif: ['Geist', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         sans: ['Geist', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },

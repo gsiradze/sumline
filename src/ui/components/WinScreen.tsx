@@ -1,96 +1,107 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PLAY_STORE_URL, WEB_APP_URL } from '../../config/links';
 import { generateShareText } from '../../game/domain/shareGrid';
-import { CELL_COUNT, Feedback } from '../../game/domain/types';
 import type { ActiveGameState } from '../../game/domain/game-state';
 import type { Stars } from '../../game/domain/stars';
-import { shareOrCopy } from '../../platform/share';
+import { displayLink, levelLink } from '../../platform/deepLink';
+import { canShareImages, shareOrCopy } from '../../platform/share';
+import type { ShareImage } from '../../platform/share';
 import { shareResult } from '../../telemetry/events';
+import { renderShareCard } from '../shareCard';
 import { ShareIcon, StarIcon } from './icons';
 
 interface WinScreenProps {
   readonly state: ActiveGameState;
-  readonly levelId: number;
+  /** The number the player sees (1-based). */
+  readonly levelNumber: number;
+  readonly tierLabel: string;
   readonly stars: Stars;
-  readonly onNext: (() => void) | null;
+  /** Null when there is no next level to go to (locked set, or the last level). */
+  readonly nextLevelNumber: number | null;
+  readonly onNext: () => void;
   readonly onBack: () => void;
+  /** True once Next has been pressed: everything is inert until the screen changes. */
+  readonly busy: boolean;
 }
 
-const AUTO_ADVANCE_MS = 4500;
+// Fixed footer: 16 + 54 + 10 + 44 + 16.
+const FOOTER_PX = 140;
 
-function buildEmojiGrid(state: ActiveGameState): string[] {
-  // Use the final state's locked cells as the "solved" picture.
-  const rows: string[] = [];
-  const side = Math.sqrt(CELL_COUNT);
-  for (let r = 0; r < side; r++) {
-    let row = '';
-    for (let c = 0; c < side; c++) {
-      const i = r * side + c;
-      if (state.puzzle.solution[i] === 1) row += '🟩';
-      else row += '⬜';
-    }
-    rows.push(row);
-  }
-  return rows;
-}
-
-export function WinScreen({ state, levelId, stars, onNext, onBack }: WinScreenProps) {
+export function WinScreen({
+  state,
+  levelNumber,
+  tierLabel,
+  stars,
+  nextLevelNumber,
+  onNext,
+  onBack,
+  busy,
+}: WinScreenProps) {
   const used = state.guesses.length;
+  // The link opens this level on the web version when there is one; the store otherwise.
+  const link = levelLink(WEB_APP_URL, levelNumber);
   const shareText = useMemo(
-    () => generateShareText(state, { levelId, stars }),
-    [state, levelId, stars],
+    () => generateShareText(state, { levelNumber, stars, url: link ?? PLAY_STORE_URL }),
+    [state, levelNumber, stars, link],
   );
-  const emojiRows = useMemo(() => buildEmojiGrid(state), [state]);
   const [copied, setCopied] = useState(false);
-  const [cancelled, setCancelled] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(Math.ceil(AUTO_ADVANCE_MS / 1000));
-  const [progress, setProgress] = useState(0);
-  const onNextRef = useRef(onNext);
-  onNextRef.current = onNext;
-
+  // Drawn ahead of time: the share sheet must open straight from the tap.
+  const cardRef = useRef<ShareImage | null>(null);
   useEffect(() => {
-    if (!onNext || cancelled) return;
-    const start = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const remaining = Math.max(0, Math.ceil((AUTO_ADVANCE_MS - elapsed) / 1000));
-      setSecondsLeft(remaining);
-      setProgress(Math.min(1, elapsed / AUTO_ADVANCE_MS));
-      if (elapsed >= AUTO_ADVANCE_MS) {
-        clearInterval(interval);
-        onNextRef.current?.();
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [onNext, cancelled]);
+    if (!canShareImages()) return;
+    let cancelled = false;
+    void renderShareCard({
+      levelNumber,
+      tierLabel,
+      rowSums: state.puzzle.rowSums,
+      colSums: state.puzzle.colSums,
+      stars,
+      guesses: used,
+      footer: link ? displayLink(link) : 'Sumline on Google Play',
+    })
+      .then(blob => {
+        if (!cancelled && blob)
+          cardRef.current = { blob, name: `sumline-level-${levelNumber}.png` };
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [levelNumber, tierLabel, state.puzzle, stars, used, link]);
+  const headlineRef = useRef<HTMLHeadingElement | null>(null);
 
-  const handleShare = useCallback(async () => {
-    const outcome = await shareOrCopy({ text: shareText, title: `Sumline L${levelId}` });
-    shareResult('level', outcome);
-    if (outcome === 'copied') {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }
-  }, [shareText, levelId]);
-
-  const dateLabel = useMemo(() => {
-    const d = new Date();
-    return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`;
+  // On short screens the result would otherwise sit under the fixed footer.
+  useEffect(() => {
+    headlineRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, []);
 
-  const available = state.guessBudget;
-  const hitGreens = state.feedbacks.length
-    ? state.feedbacks[state.feedbacks.length - 1]?.every(f => f === Feedback.Green)
-    : false;
-  void hitGreens;
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(t);
+  }, [copied]);
+
+  const handleShare = useCallback(async () => {
+    const outcome = await shareOrCopy({
+      text: shareText,
+      title: `Sumline #${levelNumber}`,
+      image: cardRef.current,
+    });
+    shareResult('level', outcome);
+    if (outcome === 'copied') setCopied(true);
+  }, [shareText, levelNumber]);
+
+  const secondary =
+    'flex-1 h-11 rounded-[12px] bg-paper-50 border border-rule-200 text-ink-700 font-sans text-[14px] font-medium inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60';
 
   return (
     <section
       className="px-4 pt-3 text-center"
       role="status"
       aria-live="polite"
-      style={{ paddingBottom: '140px' }}
+      style={{ paddingBottom: FOOTER_PX + 16 }}
     >
-      <div className="mt-2 inline-flex gap-1">
+      <div className="mt-2 inline-flex gap-1" aria-label={`${stars} of 3 stars`}>
         {[0, 1, 2].map(i => (
           <StarIcon
             key={i}
@@ -101,88 +112,44 @@ export function WinScreen({ state, levelId, stars, onNext, onBack }: WinScreenPr
           />
         ))}
       </div>
-      <h2 className="font-serif text-[42px] font-semibold leading-[1.05] tracking-[-0.015em] text-ink-900 mt-2.5">
+      <h2
+        ref={headlineRef}
+        className="font-serif text-[42px] font-semibold leading-[1.05] tracking-[-0.015em] text-ink-900 mt-2.5"
+      >
         Solved in {used}.
       </h2>
       <div className="mt-1.5 font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">
-        {used} {used === 1 ? 'guess' : 'guesses'} · {available} available
-      </div>
-
-      <div className="mt-5 mx-auto max-w-sm rounded-[16px] bg-paper-50 border border-rule-200 px-4 py-3.5 shadow-sh-1 text-left">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-ink-500">
-              Sumline · #{levelId}
-            </div>
-            <div className="font-serif text-[14px] font-medium text-ink-700 mt-0.5">
-              {dateLabel} · {used}/{available}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleShare}
-            className="h-9 px-3.5 rounded-full bg-fill-800 text-paper-50 font-sans text-[13px] font-semibold inline-flex items-center gap-2 active:scale-[0.97] transition-transform duration-nudge"
-          >
-            <ShareIcon className="w-3.5 h-3.5" />
-            <span>{copied ? 'Copied' : 'Share'}</span>
-          </button>
-        </div>
-        <div className="mt-3 font-mono text-[17px] leading-[22px] tracking-[0.04em] text-ink-900">
-          {emojiRows.map((row, i) => (
-            <div key={i}>{row}</div>
-          ))}
-        </div>
+        {used} {used === 1 ? 'guess' : 'guesses'} · {state.guessBudget} available
       </div>
 
       <div
-        className="fixed inset-x-0 z-40 px-4 pt-6"
+        className="fixed inset-x-0 z-40 px-4 pt-4 pb-4"
         style={{
-          bottom: 'var(--banner-height, 0px)',
-          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+          bottom: 'var(--bottom-reserve)',
           background:
-            'linear-gradient(to top, var(--paper-100) 55%, rgba(250,246,240,0.95) 80%, rgba(250,246,240,0) 100%)',
+            'linear-gradient(to top, var(--paper-100) 78%, rgba(250,246,240,0.9) 90%, rgba(250,246,240,0) 100%)',
         }}
       >
-        {onNext && (
+        <div className="mx-auto w-full max-w-md">
           <button
             type="button"
-            onClick={onNext}
-            className="relative w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold overflow-hidden active:scale-[0.98] transition-transform duration-nudge shadow-sh-2"
+            onClick={nextLevelNumber !== null ? onNext : onBack}
+            disabled={busy}
+            className="w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold active:scale-[0.98] transition-transform duration-nudge shadow-sh-2 disabled:opacity-60"
           >
-            {!cancelled && (
-              <span
-                className="absolute left-0 top-0 bottom-0 bg-white/[0.12] transition-[width] duration-[100ms] ease-linear"
-                style={{ width: `${progress * 100}%` }}
-                aria-hidden="true"
-              />
-            )}
-            <span className="relative">
-              Next · Level {levelId + 1}
-              {!cancelled && secondsLeft > 0 && (
-                <span className="font-mono opacity-60 ml-2">{secondsLeft}s</span>
-              )}
-            </span>
+            {nextLevelNumber !== null ? `Next · Level ${nextLevelNumber}` : 'Back to levels'}
           </button>
-        )}
-        <div className="mt-2.5 flex items-center justify-between px-1">
-          {onNext && !cancelled ? (
-            <button
-              type="button"
-              onClick={() => setCancelled(true)}
-              className="font-sans text-[13px] text-ink-500 hover:text-ink-900"
-            >
-              Cancel auto-advance
+          <div className="mt-2.5 flex items-center gap-2.5">
+            <button type="button" onClick={handleShare} disabled={busy} className={secondary}>
+              <ShareIcon className="w-4 h-4" />
+              <span>{copied ? 'Copied' : 'Share result'}</span>
             </button>
-          ) : (
-            <span />
-          )}
-          <button
-            type="button"
-            onClick={onBack}
-            className="font-sans text-[13px] text-ink-500 hover:text-ink-900"
-          >
-            Back to levels
-          </button>
+            {nextLevelNumber !== null && (
+              <button type="button" onClick={onBack} disabled={busy} className={secondary}>
+                All levels
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </section>

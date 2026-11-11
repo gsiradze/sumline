@@ -3,8 +3,18 @@
 @tailwind utilities;
 
 @layer components {
+  /* Full-height screen that keeps its content clear of the status bar and of
+     everything at the bottom: navigation bar, banner ad, and a gap above the ad. */
   .screen-min-h {
-    min-height: calc(100vh - var(--banner-height, 0px));
+    min-height: 100vh;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--bottom-reserve);
+  }
+
+  /* Same clearance for full-screen overlays (position: fixed; inset: 0). */
+  .overlay-safe {
+    padding-top: var(--safe-top);
+    padding-bottom: var(--bottom-reserve);
   }
 }
 
@@ -51,7 +61,12 @@
     --sh-3: 0 6px 18px rgba(60, 42, 20, 0.09), 0 2px 4px rgba(60, 42, 20, 0.05);
     --sh-ink: inset 0 1px 2px rgba(20, 24, 40, 0.35), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 
+    /* Set from JS when the native banner reports its size (see App.tsx). */
     --banner-height: 0px;
+    --banner-gap: 0px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --bottom-reserve: calc(var(--banner-height) + var(--banner-gap) + var(--safe-bottom));
   }
 
   .dark {
@@ -122,6 +137,12 @@
     font-variant-numeric: tabular-nums;
     line-height: 1.5;
     overscroll-behavior: none;
+    /* It is a game, not a document: no grey tap flash, no text selection, no
+       long-press callout. There are no text fields in the app. */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   #root {
@@ -141,6 +162,29 @@
 }
 
 @layer utilities {
+  /* Board cells animate around their own centre. */
+  .cell-anim {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .cell-nudge {
+    animation: cellNudge 120ms cubic-bezier(0.215, 0.61, 0.355, 1) both;
+  }
+
+  .cell-flash {
+    animation: cellPop 220ms ease-out both;
+  }
+
+  .cell-shimmer {
+    --pop: 1.08;
+    animation: cellPop 360ms ease-out both;
+  }
+
+  .board-ring {
+    animation: boardRing 1.3s ease-in-out infinite;
+  }
+
   .beaver-root {
     transform-box: fill-box;
     transform-origin: 50% 70%;
@@ -170,6 +214,35 @@
   .beaver-excl {
     opacity: 0;
     animation: bvrExcl 800ms ease-out both;
+  }
+}
+
+@keyframes cellNudge {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes cellPop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--pop, 1.05));
+  }
+}
+
+@keyframes boardRing {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
   }
 }
 
@@ -323,26 +396,31 @@
   }
 }
 
+/* Both rotate around the joint set on the element (see BeaverHero). */
 @keyframes homeBvrTail {
   0%,
   100% {
-    transform: rotate(0);
+    transform: rotate(5deg);
   }
   50% {
-    transform: rotate(-14deg);
+    transform: rotate(-9deg);
   }
 }
 
+/* Two small waves, then a rest. Kept short of the head at the inward end. */
 @keyframes homeBvrArm {
   0%,
+  60%,
   100% {
-    transform: rotate(0);
+    transform: rotate(0deg);
   }
-  30% {
-    transform: rotate(-16deg);
+  12%,
+  36% {
+    transform: rotate(-10deg);
   }
-  60% {
-    transform: rotate(-8deg);
+  24%,
+  48% {
+    transform: rotate(5deg);
   }
 }
 

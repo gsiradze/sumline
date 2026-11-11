@@ -4,11 +4,11 @@ A 6×6 deduction puzzle with a 210-level ladder across 5 difficulty tiers. Web-f
 
 ## Stack
 
-- **Phaser 4.0.0** for the game canvas (grid rendering, input, animations). Brief specified 3.90+; the React-TS template ships with 4.0.0.
-- **React 19 + TypeScript** for the UI shell (home, tier picker, level grid, share screen, retry/win overlays).
+- **React 19 + TypeScript** for everything on screen, including the board, which is an SVG component (`src/ui/components/Board.tsx`). There is no game engine: Phaser was removed in November 2026 (it was 1.35 MB to draw 36 squares).
 - **Vite 6** for dev server and bundling.
-- **Tailwind CSS 3.4** for the React UI shell only. Phaser handles its own rendering; do not style Phaser game objects with Tailwind classes.
+- **Tailwind CSS 3.4** for all UI. The board's SVG uses the same palette through `fill-*` / `stroke-*` classes.
 - **Vitest 3** for unit tests. Pure domain code (`src/game/domain/**`) has ≥80% coverage enforced in `vitest.config.ts`.
+- **Playwright** for end-to-end tests, including real pointer input on the board (tap, drag, hold).
 - **ESLint 9 (flat config)** + **Prettier 3**. Flat config lives in `eslint.config.js`.
 - **tsx** runs TypeScript scripts without a separate build step (used by `scripts/build-levels.ts`).
 
@@ -16,15 +16,20 @@ A 6×6 deduction puzzle with a 210-level ladder across 5 difficulty tiers. Web-f
 
 ```
 npm run dev            # Vite dev server on :8080
-npm run build          # build:levels → typecheck → vite build
+npm run build          # typecheck → vite build (source maps are moved to sourcemaps/, never shipped)
 npm run preview        # preview the production build
 npm run test           # vitest run (single pass)
 npm run test:watch     # vitest watch
 npm run test:cov       # vitest with coverage
+npm run test:e2e       # Playwright, on its own port (4611)
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint src scripts
 npm run format         # prettier --write .
-npm run build:levels   # regenerate public/levels.json (210 levels, committed)
+npm run check:levels   # integrity check of public/levels.json (add --deep for a difficulty report)
+npm run build:levels   # regenerate public/levels.json — manual only, the manifest is frozen
+npm run cap:sync           # build with TEST ads → cap sync → patch native
+npm run cap:sync:release   # check levels → build with LIVE ads → cap sync → patch → doctor --release
+npm run doctor         # what is missing for a release (add -- --release to make it fail)
 ```
 
 ## Architecture
@@ -32,42 +37,69 @@ npm run build:levels   # regenerate public/levels.json (210 levels, committed)
 ```
 src/
   game/
-    EventBus.ts              # Phaser Events emitter, bridge between React and Phaser
     domain/                  # Pure TS. Single source of truth for game logic. Fully unit-tested.
       types.ts               # Cell, Grid, Guess, Feedback, Tier, Puzzle, GameOutcome, constants
       rng.ts                 # mulberry32 PRNG + FNV-1a string hash + shuffle
       tiers.ts               # 5-tier config table (batches, guess budget, pre-locks, star thresholds)
       levels.ts              # 210-level ladder: coords ↔ id, seed, pre-lock indices, progress helpers
       stars.ts               # Guess-count → star (1/2/3) mapping per tier
-      difficulty.ts          # Difficulty scoring + per-tier target band
-      hint.ts                # Pick most-unblocking cell for ad-rewarded hint
+      difficulty.ts          # Difficulty scoring + per-tier target band (used by the level bake only)
+      hint.ts                # Picks the row or column a rewarded hint reveals
       feedback.ts            # per-cell GREEN/RED diff, win check
       solver.ts              # row/col sum computation + unique-solution-from-sums verifier
       puzzle.ts              # deterministic generator with rejection sampling + accept predicate
-      game-state.ts          # ActiveGameState reducer (toggle, submit, hint, pre-locked init)
+      game-state.ts          # ActiveGameState reducer (mark, note, submit, hint, pre-solved init)
+      stroke.ts              # What a tap or drag does to each cell it crosses
+      startingBoard.ts       # The board a level starts with (tutorial row / tier pre-solved cells)
+      tutorial.ts            # The guided first solve on level 1: what the coach says and points at
+      attempt.ts             # Save/restore of an attempt as its move list, replayed through the rules
+      propagator.ts          # "Line complete → rest are empty" auto-locking
+      adPolicy.ts            # Interstitial cadence (pure)
+      reviewPolicy.ts        # When to ask for a store review (pure)
       stats.ts               # Total stars, levels completed, wins/losses, guess-count distribution
       shareGrid.ts           # Emoji share text per level
       __tests__/             # co-located unit tests
     audio/                   # Web Audio sound manager + haptics
-    rendering/tokens.ts      # colors/layout/motion tokens for Phaser (kept in sync with Tailwind)
-    scenes/                  # BootScene + GridScene
-    main.ts                  # Phaser config
+  config/
+    env.ts                   # AdMob IDs and ads mode (test by default, live only in release builds)
+    links.ts                 # Store URL, privacy policy URL, support email, web version URL
+    version.ts               # App version, injected from package.json
+    demo.ts                  # Web build is a demo capped at the first 14 levels
+  platform/
+    native.ts                # Capacitor bootstrap, Android back button, foreground events
+    back.ts                  # Back-handler stack: overlays first, then screens, then leave the app
+    consent.ts               # UMP consent; nothing ad-related runs until it allows ad requests
+    deepLink.ts              # `?level=37` links: parse on arrival, build for sharing
+    share.ts, review.ts, notifications.ts, keepAwake.ts
   storage/
-    persistence.ts           # localStorage wrappers: progress, retry state, stats, mute, tutorial
-    ads.ts                   # AdProvider stub (placeholder rewarded-ad surface)
+    persistence.ts           # Capacitor Preferences (native) / localStorage (web): progress,
+                             # stats, retry state, in-progress attempts, settings
+    ads.ts                   # AdMob provider (rewarded, interstitial, banner) + web stub
+    adSession.ts             # In-memory interstitial cadence state
     levelsManifest.ts        # Loads public/levels.json at bundle time, exposes typed accessors
+  telemetry/                 # Analytics events, crash reporting, JS stack parsing
   ui/
-    PhaserGame.tsx           # Mounts Phaser, bridges state via EventBus
-    App.tsx                  # View routing: home | tier | level
-    components/              # HomeScreen, TierView, LevelCard, LevelGameView, HintButton,
-                             # RetryGate, WinScreen, TeachingHint, HistoryStrip, HeroCounter,
-                             # SubmitButton, ShareGridPreview, icons
-    hooks/                   # useGameState, useStats, useProgress, useRetry, useAudioFx
+    App.tsx                  # View routing: home | tier | level, overlays, back handling, shared links
+    shareCard.ts             # Draws the 1080×1350 share image on a canvas
+    components/              # Board (the SVG board and all its touch input), boardLayout,
+                             # BeaverOverlay, HomeScreen, TierView, LevelCard, LevelGameView,
+                             # MarkModeToggle, SubmitButton, HintButton, LastGuessSummary,
+                             # RetryGate, WinScreen, TeachingHint, TutorialCoach, RulesModal,
+                             # StatsModal, SettingsModal, GetAppModal, Splash, Wordmark,
+                             # ErrorBoundary, icons
+    hooks/                   # useGameState, useStats, useProgress, useRetry, useAudioFx,
+                             # useBackHandler, useKeepAwake
+  dev/
+    CaptureStage.tsx         # Recording stage for short-form video. Dev builds only.
   styles/
     globals.css              # Tailwind directives + design-system CSS custom properties
   main.tsx                   # React entry
 scripts/
-  build-levels.ts            # Bakes 210 levels at build time → public/levels.json
+  build-levels.ts            # Bakes the 210 levels → public/levels.json (manual only; frozen)
+  check-levels.ts            # Integrity check: structure, duplicates, rule fuzzing, save/restore
+  doctor.ts                  # Release preflight
+  patch-native.ts            # Writes AdMob app ID, permissions, Firebase config into android/ios
+android/                     # Committed native project (signing + Firebase Gradle wiring live here)
 public/
   levels.json                # Generated manifest (210 levels), committed for deterministic builds
   favicon.svg                # Simple 5-dot grid mark
@@ -75,21 +107,30 @@ public/
 
 ### Layering rules
 
-- `domain/` is pure TypeScript. No Phaser, no React, no DOM, no localStorage, no network. Fully deterministic.
+- `domain/` is pure TypeScript. No React, no DOM, no localStorage, no network. Fully deterministic.
 - `storage/` wraps platform side-effects (localStorage, ad SDK). Depends on `domain/` for types.
-- Phaser code (`src/game/` outside `domain/` and `audio/`) renders the grid and owns input but never owns state. It reads from domain state and emits events via `EventBus`.
-- React code (`src/ui/`) owns navigation (home ↔ tier ↔ level) and chrome, subscribes to `EventBus` via `PhaserGame`.
+- React code (`src/ui/`) owns navigation (home ↔ tier ↔ level), chrome and the board. The board draws domain state and turns touches into moves; it never owns game state. What a touch means (`stroke.ts`) and what the tutorial says (`tutorial.ts`) are domain rules, not component logic.
 
 ## Game mechanic — important notes
 
-The spec's binary per-cell feedback is mathematically 2-guess solvable (guess anything, flip all REDs). The "3–6 guesses" constraint in the brief is treated as a **human UX budget** per tier, not a mathematical floor. The solver verifies each puzzle has a **unique solution given its row/column sums alone**, so a patient player can deduce it without guess feedback.
+The rules as shipped (older notes described a different feedback model; these are current):
 
-**Empirical property**: every puzzle in `levels.json` is multi-solution (ambiguous from row/col sums alone). Beginner/Intermediate exclude only trivial sums (0 and GRID_SIZE); Advanced/Expert/Master also exclude near-trivial sums (1 and GRID_SIZE-1). Player must use guess feedback — patient deduction from sums alone is impossible by design.
+- The player marks cells and submits. **Only marked cells are judged.** A correct mark locks filled; a wrong mark locks empty (shown as ✕). Unmarked cells get no feedback.
+- A tap marks or unmarks one cell; a drag does the same to every open cell it crosses (starting on a marked cell erases). A drag never overwrites a note with a mark or a mark with a note, and never touches a locked cell.
+- Marks are capped at the puzzle's filled-cell count. A hint can push the count past the cap (it force-marks the filled cells it reveals); the guess is then blocked until marks are removed.
+- When a row or column has all its filled cells locked, the rest of that line auto-locks empty (`propagator.ts`). This also runs on the starting board, so a pre-solved cell can rule out a line before the first guess. The opposite direction ("remaining cells must be filled") is left to the player.
+- Win = submitting exactly the solution within the tier's guess budget.
+- Notes: the player can pencil a "ruled out" dash on any open cell (Rule out mode, or hold a cell; holding and then dragging pencils several). Notes are never judged and are cleared when the cell locks.
+- A loss does **not** reveal the answer: the retry is the same puzzle. An attempt (in progress or lost) is saved as its move list and replayed on return, so leaving a level is not a free restart.
 
-Generator pipeline (`puzzle.ts`):
+**Every puzzle is ambiguous from its sums alone.** Levels 1–63 have 2–15 grids consistent with their clues; levels 64–210 have roughly 24,000–190,000 (the intended solution-count bands for the top three tiers were not reachable with their sum filter, so the bake fell back to unfiltered grids). Consequences worth knowing before changing balance: Advanced, Expert and Master are the same puzzle distribution and differ only by guess budget; and in those tiers even a perfect solver needs more than two guesses on about half the levels, so 3★ there is partly luck. `npm run check:levels -- --deep` prints the numbers.
+
+**Do not soften the top tiers with pre-solved cells.** A taper of extra pre-solved cells (12 at level 64 down to none at level 204) was built and removed on 2026-11-11. The owner's rule: a higher tier never starts with more help than a lower one (Beginner 2 cells, Intermediate 1, the rest none), and Expert is not to be made easier. Ask before proposing anything that changes how hard a tier is.
+
+Generator pipeline (`puzzle.ts`, used only by `scripts/build-levels.ts`):
 
 1. Seed → mulberry32 → random 6×6 binary grid with 14–22 filled cells (configurable via `GenerateOptions`).
-2. Apply optional `accept` predicate (used by `scripts/build-levels.ts` to enforce sum filters, teaching-batch features, and difficulty-band targeting). Callers own all rejection logic — the generator itself applies no filters.
+2. Apply optional `accept` predicate (sum filters, teaching-batch features, difficulty-band targeting). Callers own all rejection logic — the generator itself applies no filters.
 3. Retry up to 500 attempts per seed; nudge seed by golden-ratio constant up to 50 times. If all fail, throw.
 
 Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and backtracks with column-feasibility pruning. Short-circuits at `maxSolutions=2`.
@@ -98,18 +139,20 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 
 - **5 tiers**: Beginner, Intermediate, Advanced, Expert, Master.
 - **Uneven batches**: 4 / 5 / 6 / 7 / 8 batches of 7 levels each → 210 total levels.
-- **Teaching**: Beginner Batch 1 (levels 0–6) uses curated `accept` predicates so each introduces a distinct deduction technique (empty row/col, full row/col, singleton cross, near-full cross, review).
+- **Teaching**: Beginner Batch 1 (levels 0–6) starts with one whole row pre-solved and shows a one-line tip per level (`TEACHING_TIPS` in `LevelGameView.tsx`). For a new player, level 1 is a guided first solve instead of pages of rules (`tutorial.ts`, `TutorialCoach.tsx`): read the clues, see the solved row, fill the one certain line, place the rest, read the result. It can be skipped, and runs once. A new player who opens some other level first gets the short rules pages instead. The per-level `teachingHint` strings baked into `levels.json` predate the current rules and are not shown.
 - **Procedural**: Remaining 203 levels are generated to match a target difficulty score inside the tier's band, with progressive widening of tolerance.
-- **Scaffolding** (tuned tight — 3★ always means "solve in the mathematical minimum of 2 guesses"):
+- **Scaffolding** (3★ = solved in at most 2 guesses):
   - Beginner: 5-guess budget, 2 pre-locked cells, 3★ ≤2, 2★ ≤3.
   - Intermediate: 4 guesses, 1 pre-lock, 3★ ≤2, 2★ ≤3.
   - Advanced: 4 guesses, 0 pre-locks, 3★ ≤2, 2★ ≤3.
-  - Expert: 3 guesses, 0 pre-locks, 3★ ≤2 — solve in 2 or scrape a 1★.
+  - Expert: 3 guesses, 0 pre-locks, 3★ ≤2, 2★ for a win on the last guess.
   - Master: 3 guesses, 0 pre-locks — as Expert, but with near-trivial sum filter.
-- **Unlock**: Batches within a tier unlock sequentially (complete all 7 to unlock next). Tiers are all accessible from start.
-- **Retry**: First attempt free. Losing grants 1 free instant retry. After that, each rewarded ad grants 2 more retries. Loop indefinitely.
+- **Unlock**: Batches within a tier unlock sequentially (complete all 7 to unlock next). Tiers are all accessible from start. "Next" after a win never opens a locked set.
+- **Retry**: First attempt free. Losing grants 1 free instant retry per level. After that, each rewarded ad grants 2 more retries. A lost level stays lost (and gated) until retried; the answer is never shown.
 - **Stars**: Based on guess count of the winning attempt (first try or retry). Retries remain eligible for 3★.
-- **Hints**: 1 rewarded ad = 1 hint. Game picks the most-unblocking cell (forced by row/col-sum projection) and reveals its true state.
+- **Hints**: 1 rewarded ad = 1 hint. A hint reveals a whole row or column: the one whose open cells could still be arranged in the most ways (`findHintLine`). The line is chosen when the ad pays out, from the board as it is then.
+- **Sharing**: the win screen shares the emoji result plus a link. Where the platform's share sheet takes files (mobile browsers), a 1080×1350 image of the unsolved puzzle with the result goes with it (`shareCard.ts`). In the Android app it is text and link only: handing an image to the native share sheet needs `@capacitor/filesystem`, which is not installed. The link is `VITE_WEB_URL/?level=N` when that is set, the store listing otherwise; the web version opens `?level=N` directly on that level.
+- **Ads**: banner app-wide (never before a new player has finished the tutorial), interstitial only on an explicit "Next" tap per `adPolicy.ts`, rewarded for hints and retries. The layout reserves banner height + safe area + a gap (`--bottom-reserve` in `globals.css`); no control may sit inside it.
 
 ## Conventions
 
@@ -121,11 +164,14 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 - Tests live in `__tests__/` sibling folders. Pure domain has ≥80% coverage.
 - Commits use Conventional Commits prefixes (`feat:`, `fix:`, `test:`, `refactor:`, `chore:`).
 - No new runtime dependencies without discussion. No state-management library, no CSS-in-JS, no router.
+- `public/levels.json` is frozen: never reorder or alter existing levels (saved attempts and shared results depend on it). Append only.
+- Saves: new data goes under new keys; never change the meaning of an existing key without a migration.
+- `font-serif` currently resolves to Geist on purpose (see the comment in `tailwind.config.ts`); Fraunces is used only for the board's clue numbers.
 
 ## Out of scope for v0.1
 
-- Real ad SDK integration. `src/storage/ads.ts` is a placeholder that grants immediately.
-- Capacitor wrapper (code stays compatible).
+- In-app purchases (a "Remove Ads" purchase is the planned fast-follow).
+- iOS (code is compatible; the project is Android-first).
 - Backend, accounts, leaderboards.
 - Multiple grid sizes (6×6 only; the 5×5 predecessor was replaced).
 - Localization (English only).

@@ -34,6 +34,8 @@ const noopProvider: AnalyticsProvider = {
 };
 
 let provider: AnalyticsProvider = noopProvider;
+// Collection stays off until the consent flow says otherwise.
+let consentGranted = false;
 
 export function setAnalyticsProvider(next: AnalyticsProvider): void {
   provider = next;
@@ -41,6 +43,7 @@ export function setAnalyticsProvider(next: AnalyticsProvider): void {
 
 export async function initAnalytics(): Promise<void> {
   await provider.init();
+  provider.setConsent(consentGranted);
 }
 
 export function trackEvent(event: AnalyticsEvent): void {
@@ -52,5 +55,6 @@ export function setAnalyticsUser(id: string | null): void {
 }
 
 export function setAnalyticsConsent(granted: boolean): void {
+  consentGranted = granted;
   provider.setConsent(granted);
 }

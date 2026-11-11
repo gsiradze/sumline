@@ -4,12 +4,17 @@ import { haptics } from '../../game/audio/haptics';
 import { CELL_COUNT, GameOutcome } from '../../game/domain/types';
 import type { ActiveGameState } from '../../game/domain/game-state';
 
-export function useAudioFx(state: ActiveGameState): void {
+export function useAudioFx(state: ActiveGameState, hydrated: boolean): void {
   const prev = useRef(state);
+  const wasHydrated = useRef(hydrated);
 
   useEffect(() => {
     const prevState = prev.current;
     prev.current = state;
+    const settled = wasHydrated.current;
+    wasHydrated.current = hydrated;
+    // A saved attempt appearing on screen is not news: no fanfare, no buzz.
+    if (!hydrated || !settled) return;
 
     if (prevState.outcome !== state.outcome) {
       if (state.outcome === GameOutcome.Won) {
@@ -28,7 +33,7 @@ export function useAudioFx(state: ActiveGameState): void {
         sound.playSubmitReveal();
       }
     }
-  }, [state]);
+  }, [state, hydrated]);
 }
 
 function countNewLocks(prev: ActiveGameState, curr: ActiveGameState): number {

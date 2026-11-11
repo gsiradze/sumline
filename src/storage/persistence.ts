@@ -12,10 +12,17 @@ const K_RULES = 'grid:v2:rulesShown';
 const K_MUTED = 'grid:v2:muted';
 const K_NOTIFICATIONS = 'grid:v2:notifications';
 const K_SESSION = 'grid:v2:sessionCount';
+const K_HAPTICS_OFF = 'grid:v2:hapticsOff';
+const K_ATTEMPT = (levelId: number): string => `grid:v2:attempt:${levelId}`;
 
 const SESSION_BOOT_FLAG = 'grid:session-advanced';
 
-const LEGACY_KEYS = ['grid:v1:stats', 'grid:v1:tutorialShown', 'grid:v1:muted', 'grid:v2:tutorialShown'] as const;
+const LEGACY_KEYS = [
+  'grid:v1:stats',
+  'grid:v1:tutorialShown',
+  'grid:v1:muted',
+  'grid:v2:tutorialShown',
+] as const;
 const LEGACY_DAILY_PREFIX = 'grid:v1:daily:';
 
 const MIGRATION_FLAG = 'grid:migrated-to-prefs';
@@ -128,18 +135,32 @@ async function runMigration(): Promise<void> {
   }
 }
 
+function count(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
+
 export async function loadStats(): Promise<Stats> {
   await ensureMigrated();
   const raw = await safeGet(K_STATS);
   if (!raw) return emptyStats();
   try {
-    const parsed = JSON.parse(raw) as Partial<Stats>;
+    const parsed = JSON.parse(raw) as Record<string, unknown> | null;
+    if (typeof parsed !== 'object' || parsed === null) return emptyStats();
+    const base = emptyStats();
+    const stored = Array.isArray(parsed.distribution) ? parsed.distribution : [];
+    const lastActive = parsed.lastActiveIsoDate;
     return {
-      ...emptyStats(),
-      ...parsed,
-      distribution: Array.isArray(parsed.distribution)
-        ? parsed.distribution.map(n => (typeof n === 'number' ? n : 0))
-        : emptyStats().distribution,
+      levelsCompleted: count(parsed.levelsCompleted),
+      totalStars: count(parsed.totalStars),
+      totalWins: count(parsed.totalWins),
+      totalLosses: count(parsed.totalLosses),
+      distribution: base.distribution.map((_, i) => count(stored[i])),
+      lastActiveIsoDate:
+        typeof lastActive === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lastActive)
+          ? lastActive
+          : null,
+      dayStreak: count(parsed.dayStreak),
+      bestDayStreak: count(parsed.bestDayStreak),
     };
   } catch {
     return emptyStats();
@@ -215,6 +236,27 @@ export async function clearRetryState(levelId: number): Promise<void> {
   await safeRemove(K_RETRY(levelId));
 }
 
+// The in-progress (or lost) attempt for a level, stored as its move list.
+// Validation happens on replay in the domain layer, so this returns raw JSON.
+export async function loadAttempt(levelId: number): Promise<unknown> {
+  await ensureMigrated();
+  const raw = await safeGet(K_ATTEMPT(levelId));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveAttempt(levelId: number, snapshot: unknown): Promise<void> {
+  await safeSet(K_ATTEMPT(levelId), JSON.stringify(snapshot));
+}
+
+export async function clearAttempt(levelId: number): Promise<void> {
+  await safeRemove(K_ATTEMPT(levelId));
+}
+
 export async function getRulesShown(): Promise<boolean> {
   await ensureMigrated();
   return (await safeGet(K_RULES)) === '1';
@@ -233,6 +275,16 @@ export async function getMuted(): Promise<boolean> {
 export async function setMuted(muted: boolean): Promise<void> {
   if (muted) await safeSet(K_MUTED, '1');
   else await safeRemove(K_MUTED);
+}
+
+export async function getHapticsEnabled(): Promise<boolean> {
+  await ensureMigrated();
+  return (await safeGet(K_HAPTICS_OFF)) !== '1';
+}
+
+export async function setHapticsEnabled(enabled: boolean): Promise<void> {
+  if (enabled) await safeRemove(K_HAPTICS_OFF);
+  else await safeSet(K_HAPTICS_OFF, '1');
 }
 
 export async function getNotificationsEnabled(): Promise<boolean> {

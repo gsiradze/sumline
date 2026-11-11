@@ -1,13 +1,13 @@
 import type { Stats } from '../../game/domain/stats';
 import { TOTAL_LEVELS, TIER_CONFIGS } from '../../game/domain/tiers';
-import {
-  maxStarsForTier,
-  maxStarsTotal,
-  tierStars,
-  totalStars,
-} from '../../game/domain/levels';
+import { maxStarsForTier, maxStarsTotal, tierStars, totalStars } from '../../game/domain/levels';
 import type { LevelProgressMap } from '../../game/domain/levels';
+import { BACK_PRIORITY_OVERLAY } from '../../platform/back';
+import { useBackHandler } from '../hooks/useBackHandler';
 import { CloseIcon, FlameIcon } from './icons';
+
+// The stored distribution has room for 8 guesses; no tier allows that many.
+const MAX_BUDGET = Math.max(...TIER_CONFIGS.map(c => c.guessBudget));
 
 interface StatsModalProps {
   readonly stats: Stats;
@@ -24,28 +24,26 @@ const TIER_ACCENT: Record<string, string> = {
 };
 
 export function StatsModal({ stats, progress, onDismiss }: StatsModalProps) {
+  useBackHandler(onDismiss, BACK_PRIORITY_OVERLAY);
   const starsEarned = totalStars(progress);
   const starsMax = maxStarsTotal();
-  const maxDist = Math.max(1, ...stats.distribution);
+  const distribution = stats.distribution.slice(0, MAX_BUDGET);
+  const maxDist = Math.max(1, ...distribution);
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-paper-100 flex flex-col overflow-y-auto"
+      className="overlay-safe fixed inset-0 z-50 bg-paper-100 flex flex-col overflow-y-auto"
       role="dialog"
       aria-label="Your stats"
-      style={{
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
     >
-      <header className="px-4 pt-[18px] pb-2.5 flex items-center justify-between">
-        <div className="w-9" />
+      <header className="px-4 pt-3 pb-2.5 flex items-center justify-between">
+        <div className="w-11" />
         <h2 className="font-serif text-[20px] font-medium text-ink-900">Stats</h2>
         <button
           type="button"
           onClick={onDismiss}
           aria-label="Close stats"
-          className="w-9 h-9 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+          className="w-11 h-11 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
         >
           <CloseIcon className="w-3.5 h-3.5" />
         </button>
@@ -53,7 +51,12 @@ export function StatsModal({ stats, progress, onDismiss }: StatsModalProps) {
 
       {/* 3 topline tiles */}
       <div className="px-4 pt-1.5 grid grid-cols-3 gap-2">
-        <Tile big={String(starsEarned)} sub="stars" foot={`of ${starsMax}`} accentClass="text-ochre-500" />
+        <Tile
+          big={String(starsEarned)}
+          sub="stars"
+          foot={`of ${starsMax}`}
+          accentClass="text-ochre-500"
+        />
         <Tile
           big={String(stats.levelsCompleted)}
           sub="levels"
@@ -110,14 +113,12 @@ export function StatsModal({ stats, progress, onDismiss }: StatsModalProps) {
           Guess distribution
         </div>
         <div className="bg-paper-50 border border-rule-200 rounded-[14px] px-3.5 py-3">
-          {stats.distribution.map((count, i) => {
+          {distribution.map((count, i) => {
             const n = i + 1;
             const barClass = n <= 2 ? 'bg-sage-500' : n <= 4 ? 'bg-ochre-500' : 'bg-clay-500';
             return (
               <div key={i} className="flex items-center gap-2.5 h-7">
-                <span className="w-4 font-serif text-[14px] text-ink-900 tabular-nums">
-                  {n}
-                </span>
+                <span className="w-4 font-serif text-[14px] text-ink-900 tabular-nums">{n}</span>
                 <div className="flex-1 h-[18px]">
                   <div
                     className={`h-full rounded-[4px] ${barClass} flex items-center justify-end pr-2 font-mono text-[11px] text-paper-50 font-medium tabular-nums`}

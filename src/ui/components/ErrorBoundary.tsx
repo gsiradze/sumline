@@ -35,8 +35,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       <main
         className="min-h-screen flex flex-col items-center justify-center gap-7 bg-paper-100 px-6 text-center"
         style={{
-          paddingTop: 'max(24px, env(safe-area-inset-top))',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+          paddingTop: 'calc(24px + var(--safe-top))',
+          paddingBottom: 'calc(24px + var(--bottom-reserve))',
         }}
       >
         <div>

@@ -5,21 +5,20 @@ const GREEN_EMOJI = '🟩';
 const RED_EMOJI = '🟥';
 
 export interface ShareGridOptions {
-  readonly levelId: number;
+  readonly levelNumber: number;
   readonly url?: string;
-  readonly titlePrefix?: string;
   readonly stars?: 0 | 1 | 2 | 3;
 }
 
 export function generateShareText(state: ActiveGameState, opts: ShareGridOptions): string {
-  const prefix = opts.titlePrefix ?? 'Grid L';
   const count = state.guesses.length;
   const stars = opts.stars ?? 0;
   const starPart = stars > 0 ? ` · ${starRow(stars)}` : '';
-  const header = `${prefix}${opts.levelId}${starPart} ${shareCount(state.outcome, count, state.guessBudget)}`;
+  const header = `Sumline #${opts.levelNumber}${starPart} ${shareCount(state.outcome, count, state.guessBudget)}`;
   const blocks = state.feedbacks.map(feedbackToBlock).join('\n\n');
-  const url = opts.url ?? `grid.game/L${opts.levelId}`;
-  return `${header}\n\n${blocks}\n\n${url}`;
+  const parts = [header, blocks];
+  if (opts.url) parts.push(opts.url);
+  return parts.join('\n\n');
 }
 
 function starRow(stars: 0 | 1 | 2 | 3): string {

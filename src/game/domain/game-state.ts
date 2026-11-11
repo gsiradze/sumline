@@ -11,6 +11,8 @@ export interface ActiveGameState {
   readonly currentMarks: readonly Cell[];
   readonly lockedFilled: readonly boolean[];
   readonly lockedEmpty: readonly boolean[];
+  // Player-only "I think this is empty" pencil notes. Never judged, never part of a guess.
+  readonly emptyNotes: readonly boolean[];
   readonly outcome: GameOutcome;
   readonly hintsUsed: number;
 }
@@ -22,18 +24,24 @@ export interface InitialGameStateOptions {
 }
 
 export function initialGameState(opts: InitialGameStateOptions): ActiveGameState {
-  const lockedFilled = new Array<boolean>(CELL_COUNT).fill(false);
-  const lockedEmpty = new Array<boolean>(CELL_COUNT).fill(false);
-  const currentMarks = new Array<Cell>(CELL_COUNT).fill(0);
+  const preFilled = new Array<boolean>(CELL_COUNT).fill(false);
+  const preEmpty = new Array<boolean>(CELL_COUNT).fill(false);
   const preLocks = opts.preLockedCells ?? [];
   for (const i of preLocks) {
     if (i < 0 || i >= CELL_COUNT) continue;
-    if (opts.puzzle.solution[i] === 1) {
-      lockedFilled[i] = true;
-      currentMarks[i] = 1;
-    } else {
-      lockedEmpty[i] = true;
-    }
+    if (opts.puzzle.solution[i] === 1) preFilled[i] = true;
+    else preEmpty[i] = true;
+  }
+  // A pre-solved cell can already complete its row or column; the rest of that
+  // line is then known empty, exactly as it would be after a guess.
+  const { lockedFilled, lockedEmpty } = propagateForcedLocks(
+    { lockedFilled: preFilled, lockedEmpty: preEmpty },
+    opts.puzzle.rowSums,
+    opts.puzzle.colSums,
+  );
+  const currentMarks = new Array<Cell>(CELL_COUNT).fill(0);
+  for (let i = 0; i < CELL_COUNT; i++) {
+    if (lockedFilled[i]) currentMarks[i] = 1;
   }
   return {
     puzzle: opts.puzzle,
@@ -43,6 +51,7 @@ export function initialGameState(opts: InitialGameStateOptions): ActiveGameState
     currentMarks,
     lockedFilled,
     lockedEmpty,
+    emptyNotes: new Array<boolean>(CELL_COUNT).fill(false),
     outcome: GameOutcome.InProgress,
     hintsUsed: 0,
   };
@@ -54,10 +63,6 @@ export function isCellLocked(state: ActiveGameState, index: number): boolean {
 
 export function canToggle(state: ActiveGameState, index: number): boolean {
   return state.outcome === GameOutcome.InProgress && !isCellLocked(state, index);
-}
-
-export function canSubmit(state: ActiveGameState): boolean {
-  return state.outcome === GameOutcome.InProgress;
 }
 
 export function guessesUsed(state: ActiveGameState): number {
@@ -78,6 +83,28 @@ export function remainingMarkBudget(state: ActiveGameState): number {
   return Math.max(0, state.puzzle.filledCount - markedCount(state));
 }
 
+// Only a hint can push marks past the cap: it force-marks the filled cells it
+// reveals on top of a full set of player marks. Such a guess can never be the solution.
+export function isOverMarkCap(state: ActiveGameState): boolean {
+  return markedCount(state) > state.puzzle.filledCount;
+}
+
+export function canSubmit(state: ActiveGameState): boolean {
+  return state.outcome === GameOutcome.InProgress && !isOverMarkCap(state);
+}
+
+function notesWithoutLocked(
+  notes: readonly boolean[],
+  lockedFilled: readonly boolean[],
+  lockedEmpty: readonly boolean[],
+): boolean[] {
+  const next = [...notes];
+  for (let i = 0; i < CELL_COUNT; i++) {
+    if (lockedFilled[i] || lockedEmpty[i]) next[i] = false;
+  }
+  return next;
+}
+
 export function toggleMark(state: ActiveGameState, index: number): ActiveGameState {
   if (!canToggle(state, index)) return state;
   if (index < 0 || index >= CELL_COUNT) return state;
@@ -88,7 +115,21 @@ export function toggleMark(state: ActiveGameState, index: number): ActiveGameSta
   }
   const nextMarks = [...state.currentMarks];
   nextMarks[index] = currentlyMarked ? 0 : 1;
-  return { ...state, currentMarks: nextMarks };
+  if (!state.emptyNotes[index]) return { ...state, currentMarks: nextMarks };
+  const nextNotes = [...state.emptyNotes];
+  nextNotes[index] = false;
+  return { ...state, currentMarks: nextMarks, emptyNotes: nextNotes };
+}
+
+export function toggleNote(state: ActiveGameState, index: number): ActiveGameState {
+  if (!canToggle(state, index)) return state;
+  if (index < 0 || index >= CELL_COUNT) return state;
+  const nextNotes = [...state.emptyNotes];
+  nextNotes[index] = !state.emptyNotes[index];
+  if (state.currentMarks[index] !== 1) return { ...state, emptyNotes: nextNotes };
+  const nextMarks = [...state.currentMarks];
+  nextMarks[index] = 0;
+  return { ...state, currentMarks: nextMarks, emptyNotes: nextNotes };
 }
 
 export function submitGuess(state: ActiveGameState): ActiveGameState {
@@ -136,19 +177,29 @@ export function submitGuess(state: ActiveGameState): ActiveGameState {
     currentMarks: nextMarks,
     lockedFilled: propagated.lockedFilled,
     lockedEmpty: propagated.lockedEmpty,
+    emptyNotes: notesWithoutLocked(
+      state.emptyNotes,
+      propagated.lockedFilled,
+      propagated.lockedEmpty,
+    ),
     outcome,
   };
 }
 
-export function applyHint(state: ActiveGameState, cellIndex: number): ActiveGameState {
+/** A hint: the true state of every still-open cell in `cells` is locked in. */
+export function applyHint(state: ActiveGameState, cells: readonly number[]): ActiveGameState {
   if (state.outcome !== GameOutcome.InProgress) return state;
-  if (cellIndex < 0 || cellIndex >= CELL_COUNT) return state;
-  if (isCellLocked(state, cellIndex)) return state;
-  const truth = state.puzzle.solution[cellIndex];
   const preFilled = [...state.lockedFilled];
   const preEmpty = [...state.lockedEmpty];
-  if (truth === 1) preFilled[cellIndex] = true;
-  else preEmpty[cellIndex] = true;
+  let revealed = 0;
+  for (const i of cells) {
+    if (!Number.isInteger(i) || i < 0 || i >= CELL_COUNT) continue;
+    if (preFilled[i] || preEmpty[i]) continue;
+    if (state.puzzle.solution[i] === 1) preFilled[i] = true;
+    else preEmpty[i] = true;
+    revealed++;
+  }
+  if (revealed === 0) return state;
   const propagated = propagateForcedLocks(
     { lockedFilled: preFilled, lockedEmpty: preEmpty },
     state.puzzle.rowSums,
@@ -164,6 +215,11 @@ export function applyHint(state: ActiveGameState, cellIndex: number): ActiveGame
     lockedFilled: propagated.lockedFilled,
     lockedEmpty: propagated.lockedEmpty,
     currentMarks: nextMarks,
+    emptyNotes: notesWithoutLocked(
+      state.emptyNotes,
+      propagated.lockedFilled,
+      propagated.lockedEmpty,
+    ),
     hintsUsed: state.hintsUsed + 1,
   };
 }

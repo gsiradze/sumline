@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { isoDateUTC } from '../game/domain/stats';
+import { isoDateLocal } from '../game/domain/stats';
 import type { Stats } from '../game/domain/stats';
 
 const DAILY_ID_BASE = 4100;
@@ -55,7 +55,7 @@ export async function scheduleReminders(stats: Stats, enabled: boolean): Promise
       });
     }
 
-    const playedToday = stats.lastActiveIsoDate === isoDateUTC(now);
+    const playedToday = stats.lastActiveIsoDate === isoDateLocal(now);
     if (stats.dayStreak >= STREAK_MIN && !playedToday) {
       const at = new Date(now);
       at.setHours(19, 0, 0, 0);

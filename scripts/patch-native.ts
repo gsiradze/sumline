@@ -2,14 +2,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /* =========================================================================
-   Idempotent native patcher. Run AFTER `npx cap add` / `npx cap sync`, since
-   ios/ and android/ are gitignored and regenerated per build.
+   Idempotent native patcher. Run AFTER `npx cap add` / `npx cap sync`.
 
    Applies: ATT usage string, AdMob app IDs, encryption exemption, notification
    permission, and copies committed native config files (google-services.json /
-   GoogleService-Info.plist) from native-config/. Each edit greps its own output
-   first, so re-running is safe. Gradle plugin lines and Firebase setup that this
-   cannot safely automate live in the native checklist.
+   GoogleService-Info.plist) from native-config/. Every edit can be re-run: an
+   existing value is replaced, not duplicated and not left stale.
+
+   The AdMob app ID is always written. With no ID in .env it is Google's sample
+   ID, so a test build runs (the Google Mobile Ads SDK crashes the app at launch
+   when the entry is missing). `npm run doctor -- --release` refuses a store
+   build that still carries the sample ID.
 
    Usage: npm run patch:native
    ========================================================================= */
@@ -17,6 +20,9 @@ import { resolve } from 'node:path';
 const ROOT = process.cwd();
 
 const ATT_MESSAGE = 'Your data will be used to show you fewer, more relevant ads.';
+const ADMOB_APP_ID_KEY = 'com.google.android.gms.ads.APPLICATION_ID';
+const SAMPLE_ADMOB_APP_ID_ANDROID = 'ca-app-pub-3940256099942544~3347511713';
+const SAMPLE_ADMOB_APP_ID_IOS = 'ca-app-pub-3940256099942544~1458002511';
 
 interface EnvMap {
   [key: string]: string;
@@ -24,10 +30,7 @@ interface EnvMap {
 
 function readEnv(): EnvMap {
   const file = resolve(ROOT, '.env');
-  if (!existsSync(file)) {
-    console.warn('[patch-native] no .env found — AdMob app IDs will be skipped.');
-    return {};
-  }
+  if (!existsSync(file)) return {};
   const env: EnvMap = {};
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     const trimmed = line.trim();
@@ -39,15 +42,19 @@ function readEnv(): EnvMap {
   return env;
 }
 
-/** Insert `<key>…</key><value>` after the first <dict> if the key is absent. */
-export function ensureInPlist(content: string, key: string, valueXml: string): string {
-  if (content.includes(`<key>${key}</key>`)) return content;
+function realId(value: string | undefined): string | null {
+  return value && !value.includes('xxxx') ? value : null;
+}
+
+/** Sets `<key>…</key><value>` in a plist, replacing an existing value. */
+export function setInPlist(content: string, key: string, valueXml: string): string {
+  const existing = new RegExp(`(<key>${key}</key>\\s*)(<string>[^<]*</string>|<true/>|<false/>)`);
+  if (existing.test(content)) return content.replace(existing, `$1${valueXml}`);
   const marker = '<dict>';
   const idx = content.indexOf(marker);
   if (idx < 0) return content;
   const insertAt = idx + marker.length;
-  const block = `\n\t<key>${key}</key>\n\t${valueXml}`;
-  return content.slice(0, insertAt) + block + content.slice(insertAt);
+  return `${content.slice(0, insertAt)}\n\t<key>${key}</key>\n\t${valueXml}${content.slice(insertAt)}`;
 }
 
 export function ensureAndroidPermission(content: string, permission: string): string {
@@ -56,45 +63,63 @@ export function ensureAndroidPermission(content: string, permission: string): st
   return content.replace(/(<manifest[^>]*>)/, `$1\n    ${line}`);
 }
 
-export function ensureAndroidMetaData(content: string, name: string, value: string): string {
-  if (content.includes(name)) return content;
+/** Sets an application-level `<meta-data>`, replacing an existing value. */
+export function setAndroidMetaData(content: string, name: string, value: string): string {
+  const escaped = name.replace(/\./g, '\\.');
+  const existing = new RegExp(
+    `(<meta-data\\s+android:name="${escaped}"\\s+android:value=")[^"]*(")`,
+  );
+  if (existing.test(content)) return content.replace(existing, `$1${value}$2`);
   const meta = `<meta-data android:name="${name}" android:value="${value}" />`;
   return content.replace(/(<application[^>]*>)/, `$1\n        ${meta}`);
 }
 
 function patchIos(env: EnvMap): void {
   const plist = resolve(ROOT, 'ios/App/App/Info.plist');
-  if (!existsSync(plist)) {
-    console.warn('[patch-native] ios/ not found — run `npx cap add ios` first. Skipping iOS.');
-    return;
-  }
+  if (!existsSync(plist)) return;
   let content = readFileSync(plist, 'utf8');
-  content = ensureInPlist(
+  content = setInPlist(
     content,
     'NSUserTrackingUsageDescription',
     `<string>${ATT_MESSAGE}</string>`,
   );
-  content = ensureInPlist(content, 'ITSAppUsesNonExemptEncryption', '<false/>');
-  const appId = env.VITE_ADMOB_APP_ID_IOS;
-  if (appId) content = ensureInPlist(content, 'GADApplicationIdentifier', `<string>${appId}</string>`);
-  else console.warn('[patch-native] VITE_ADMOB_APP_ID_IOS not set — skipped GADApplicationIdentifier.');
+  content = setInPlist(content, 'ITSAppUsesNonExemptEncryption', '<false/>');
+  const appId = realId(env.VITE_ADMOB_APP_ID_IOS);
+  if (!appId)
+    console.warn(
+      '[patch-native] VITE_ADMOB_APP_ID_IOS not set — using the sample AdMob app ID (test builds only).',
+    );
+  content = setInPlist(
+    content,
+    'GADApplicationIdentifier',
+    `<string>${appId ?? SAMPLE_ADMOB_APP_ID_IOS}</string>`,
+  );
   writeFileSync(plist, content);
 
-  copyIfPresent('native-config/ios/GoogleService-Info.plist', 'ios/App/App/GoogleService-Info.plist');
+  copyIfPresent(
+    'native-config/ios/GoogleService-Info.plist',
+    'ios/App/App/GoogleService-Info.plist',
+  );
   console.log('[patch-native] iOS Info.plist patched.');
 }
 
 function patchAndroid(env: EnvMap): void {
   const manifest = resolve(ROOT, 'android/app/src/main/AndroidManifest.xml');
   if (!existsSync(manifest)) {
-    console.warn('[patch-native] android/ not found — run `npx cap add android` first. Skipping Android.');
+    console.warn(
+      '[patch-native] android/ not found — run `npx cap add android` first. Skipping Android.',
+    );
     return;
   }
   let content = readFileSync(manifest, 'utf8');
   content = ensureAndroidPermission(content, 'android.permission.POST_NOTIFICATIONS');
-  const appId = env.VITE_ADMOB_APP_ID_ANDROID;
-  if (appId) content = ensureAndroidMetaData(content, 'com.google.android.gms.ads.APPLICATION_ID', appId);
-  else console.warn('[patch-native] VITE_ADMOB_APP_ID_ANDROID not set — skipped AdMob meta-data.');
+  const appId = realId(env.VITE_ADMOB_APP_ID_ANDROID);
+  if (!appId) {
+    console.warn(
+      '[patch-native] VITE_ADMOB_APP_ID_ANDROID not set — using the sample AdMob app ID. Fine for test builds; `doctor --release` blocks a store build like this.',
+    );
+  }
+  content = setAndroidMetaData(content, ADMOB_APP_ID_KEY, appId ?? SAMPLE_ADMOB_APP_ID_ANDROID);
   writeFileSync(manifest, content);
 
   copyIfPresent('native-config/android/google-services.json', 'android/app/google-services.json');
@@ -113,9 +138,11 @@ function copyIfPresent(from: string, to: string): void {
 
 function main(): void {
   const env = readEnv();
+  if (Object.keys(env).length === 0)
+    console.warn('[patch-native] no .env found — sample AdMob app IDs will be used.');
   patchIos(env);
   patchAndroid(env);
-  console.log('[patch-native] Done. See the native checklist for Gradle/Firebase steps this cannot automate.');
+  console.log('[patch-native] Done.');
 }
 
 // Run only when invoked directly (not when imported by tests).

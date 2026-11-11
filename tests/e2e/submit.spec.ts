@@ -1,63 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-interface TestCell {
-  readonly value: 0 | 1;
-}
-
-interface TestState {
-  readonly puzzle: {
-    readonly solution: readonly number[];
-    readonly filledCount: number;
-    readonly rowSums: readonly number[];
-    readonly colSums: readonly number[];
-  };
-  readonly currentMarks: readonly number[];
-  readonly outcome: 'in-progress' | 'won' | 'lost';
-  readonly guesses: readonly TestCell[][];
-  readonly lockedFilled: readonly boolean[];
-  readonly lockedEmpty: readonly boolean[];
-}
-
-declare global {
-  interface Window {
-    __gridTest?: {
-      openLevel: (id: number) => void;
-      backToHome: () => void;
-      tapCell: (index: number) => void;
-      submit: () => void;
-      restart: () => void;
-      getState: () => TestState | null;
-    };
-  }
-}
-
-async function waitForHook(page: import('@playwright/test').Page): Promise<void> {
-  await page.waitForFunction(() => typeof window.__gridTest !== 'undefined');
-}
-
-async function openLevel(page: import('@playwright/test').Page, id: number): Promise<void> {
-  await page.evaluate((levelId: number) => {
-    window.__gridTest!.openLevel(levelId);
-  }, id);
-  await page.waitForFunction(() => window.__gridTest?.getState() !== null);
-}
-
-async function getState(page: import('@playwright/test').Page): Promise<TestState> {
-  const s = await page.evaluate(() => window.__gridTest!.getState());
-  if (!s) throw new Error('state not available');
-  return s;
-}
-
-const OUTCOME_IN_PROGRESS = 'in-progress' as const;
-const OUTCOME_WON = 'won' as const;
-const OUTCOME_LOST = 'lost' as const;
-void OUTCOME_LOST;
+import { OUTCOME_IN_PROGRESS, OUTCOME_WON, freshStart, getState, openLevel } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await waitForHook(page);
+  await freshStart(page);
 });
 
 test('wrong guess with enough right marks does NOT auto-win (Level 4 regression)', async ({
@@ -132,8 +78,18 @@ test('spam-all-16 does not auto-win on Level 4', async ({ page }) => {
   const idx = (r: number, c: number): number => r * 6 + c;
   const marks: number[] = [
     idx(0, 1),
-    idx(1, 0), idx(1, 1), idx(1, 2), idx(1, 3), idx(1, 4), idx(1, 5),
-    idx(2, 0), idx(2, 1), idx(2, 2), idx(2, 3), idx(2, 4), idx(2, 5),
+    idx(1, 0),
+    idx(1, 1),
+    idx(1, 2),
+    idx(1, 3),
+    idx(1, 4),
+    idx(1, 5),
+    idx(2, 0),
+    idx(2, 1),
+    idx(2, 2),
+    idx(2, 3),
+    idx(2, 4),
+    idx(2, 5),
     idx(3, 1),
     idx(4, 1),
     idx(5, 1),
@@ -173,8 +129,18 @@ test('propagator does not over-solve the board on a wrong guess', async ({ page 
   const idx = (r: number, c: number): number => r * 6 + c;
   const marks: number[] = [
     idx(0, 1),
-    idx(1, 0), idx(1, 1), idx(1, 2), idx(1, 3), idx(1, 4), idx(1, 5),
-    idx(2, 0), idx(2, 1), idx(2, 2), idx(2, 3), idx(2, 4), idx(2, 5),
+    idx(1, 0),
+    idx(1, 1),
+    idx(1, 2),
+    idx(1, 3),
+    idx(1, 4),
+    idx(1, 5),
+    idx(2, 0),
+    idx(2, 1),
+    idx(2, 2),
+    idx(2, 3),
+    idx(2, 4),
+    idx(2, 5),
     idx(3, 1),
     idx(4, 1),
     idx(5, 1),
@@ -212,10 +178,7 @@ test('WinScreen does not appear on a wrong guess (visible DOM check)', async ({ 
 
   await page.evaluate(() => window.__gridTest!.submit());
 
-  // The WinScreen contains text "Nice deduction." — must not be in the DOM.
-  const winVisible = await page.getByText('Nice deduction.').count();
-  expect(winVisible).toBe(0);
+  // The win screen's headline is "Solved in N." — it must not be in the DOM.
+  await expect(page.getByText(/^Solved in \d/)).toHaveCount(0);
+  await expect(page.getByText('Guess 2 of 5')).toBeVisible();
 });
-
-// Silence the unused-type warning.
-void ({} as TestCell);

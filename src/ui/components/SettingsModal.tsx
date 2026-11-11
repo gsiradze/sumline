@@ -1,23 +1,22 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { PRIVACY_POLICY_URL, SUPPORT_EMAIL } from '../../config/links';
+import { APP_VERSION } from '../../config/version';
 import type { Stats } from '../../game/domain/stats';
-import {
-  getNotificationsEnabled,
-  setNotificationsEnabled,
-} from '../../storage/persistence';
+import { getNotificationsEnabled, setNotificationsEnabled } from '../../storage/persistence';
+import { BACK_PRIORITY_OVERLAY } from '../../platform/back';
 import { isNative } from '../../platform/native';
-import { showPrivacyOptions } from '../../platform/consent';
-import {
-  requestNotificationPermission,
-  scheduleReminders,
-} from '../../platform/notifications';
+import { currentConsent, showPrivacyOptions } from '../../platform/consent';
+import { requestNotificationPermission, scheduleReminders } from '../../platform/notifications';
 import { settingChanged } from '../../telemetry/events';
-import { CloseIcon } from './icons';
-
-const APP_VERSION = '0.1.0';
+import { useBackHandler } from '../hooks/useBackHandler';
+import { ChevronRightIcon, CloseIcon } from './icons';
 
 interface SettingsModalProps {
   readonly muted: boolean;
   readonly onToggleMute: () => void;
+  readonly hapticsOn: boolean;
+  readonly onToggleHaptics: () => void;
   readonly stats: Stats;
   readonly onDismiss: () => void;
 }
@@ -60,7 +59,7 @@ function ToggleRow({
       role="switch"
       aria-checked={on}
       aria-label={label}
-      className="w-full flex items-center justify-between px-4 py-3.5 text-left active:bg-paper-200/50 transition-colors disabled:opacity-50"
+      className="w-full min-h-[52px] flex items-center justify-between px-4 py-3 text-left active:bg-paper-200/50 transition-colors disabled:opacity-50"
     >
       <span>
         <span className="block font-sans text-[15px] text-ink-900">{label}</span>
@@ -71,9 +70,30 @@ function ToggleRow({
   );
 }
 
-export function SettingsModal({ muted, onToggleMute, stats, onDismiss }: SettingsModalProps) {
+const linkRow =
+  'w-full min-h-[52px] flex items-center justify-between px-4 py-3 text-left font-sans text-[15px] text-ink-900 active:bg-paper-200/50 transition-colors';
+
+function LinkRow({ href, children }: { readonly href: string; readonly children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={linkRow}>
+      <span>{children}</span>
+      <ChevronRightIcon className="w-4 h-4 text-ink-400" />
+    </a>
+  );
+}
+
+export function SettingsModal({
+  muted,
+  onToggleMute,
+  hapticsOn,
+  onToggleHaptics,
+  stats,
+  onDismiss,
+}: SettingsModalProps) {
+  useBackHandler(onDismiss, BACK_PRIORITY_OVERLAY);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifBusy, setNotifBusy] = useState(false);
+  const [notifDenied, setNotifDenied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,17 +105,17 @@ export function SettingsModal({ muted, onToggleMute, stats, onDismiss }: Setting
     };
   }, []);
 
-  const handleToggleSound = (): void => {
-    onToggleMute();
-  };
-
   const handleToggleNotifications = async (): Promise<void> => {
     if (notifBusy) return;
     setNotifBusy(true);
     try {
       if (!notifEnabled) {
         const granted = await requestNotificationPermission();
-        if (!granted && isNative()) return;
+        if (!granted && isNative()) {
+          setNotifDenied(true);
+          return;
+        }
+        setNotifDenied(false);
         await setNotificationsEnabled(true);
         setNotifEnabled(true);
         settingChanged('notifications', true);
@@ -111,50 +131,60 @@ export function SettingsModal({ muted, onToggleMute, stats, onDismiss }: Setting
     }
   };
 
+  // The consent platform says where a "change my choices" entry point is
+  // required; elsewhere the form does not exist and the row would do nothing.
+  const showPrivacyChoices = isNative() && currentConsent().privacyOptionsRequired;
+  const hasLinks = showPrivacyChoices || PRIVACY_POLICY_URL !== '' || SUPPORT_EMAIL !== '';
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-paper-100 flex flex-col overflow-y-auto"
+      className="overlay-safe fixed inset-0 z-50 bg-paper-100 flex flex-col overflow-y-auto"
       role="dialog"
       aria-label="Settings"
-      style={{
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + var(--banner-height, 0px))',
-      }}
     >
-      <header className="px-4 pt-[18px] pb-2.5 flex items-center justify-between">
-        <div className="w-9" />
+      <header className="px-4 pt-3 pb-2.5 flex items-center justify-between">
+        <div className="w-11" />
         <h2 className="font-serif text-[20px] font-medium text-ink-900">Settings</h2>
         <button
           type="button"
           onClick={onDismiss}
           aria-label="Close settings"
-          className="w-9 h-9 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+          className="w-11 h-11 rounded-md border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
         >
           <CloseIcon className="w-3.5 h-3.5" />
         </button>
       </header>
 
       <div className="mt-2 mx-4 rounded-[16px] border border-rule-200 bg-paper-50 overflow-hidden divide-y divide-rule-200">
-        <ToggleRow label="Sound" on={!muted} onToggle={handleToggleSound} />
+        <ToggleRow label="Sound" on={!muted} onToggle={onToggleMute} />
+        <ToggleRow label="Vibration" on={hapticsOn} onToggle={onToggleHaptics} />
         <ToggleRow
           label="Reminders"
-          hint="A gentle nudge to keep your streak alive"
+          hint={
+            notifDenied
+              ? 'Notifications are blocked. Allow them for Sumline in system settings.'
+              : 'A gentle nudge to keep your streak alive'
+          }
           on={notifEnabled}
           disabled={notifBusy}
           onToggle={() => void handleToggleNotifications()}
         />
       </div>
 
-      {isNative() && (
-        <div className="mt-4 mx-4 rounded-[16px] border border-rule-200 bg-paper-50 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => void showPrivacyOptions()}
-            className="w-full flex items-center justify-between px-4 py-3.5 text-left active:bg-paper-200/50 transition-colors"
-          >
-            <span className="font-sans text-[15px] text-ink-900">Privacy &amp; ad choices</span>
-            <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-ink-500">Open</span>
-          </button>
+      {hasLinks && (
+        <div className="mt-4 mx-4 rounded-[16px] border border-rule-200 bg-paper-50 overflow-hidden divide-y divide-rule-200">
+          {PRIVACY_POLICY_URL !== '' && <LinkRow href={PRIVACY_POLICY_URL}>Privacy policy</LinkRow>}
+          {showPrivacyChoices && (
+            <button type="button" onClick={() => void showPrivacyOptions()} className={linkRow}>
+              <span>Privacy &amp; ad choices</span>
+              <ChevronRightIcon className="w-4 h-4 text-ink-400" />
+            </button>
+          )}
+          {SUPPORT_EMAIL !== '' && (
+            <LinkRow href={`mailto:${SUPPORT_EMAIL}?subject=Sumline%20${APP_VERSION}`}>
+              Contact support
+            </LinkRow>
+          )}
         </div>
       )}
 

@@ -1,5 +1,18 @@
 # Sumline — Production Handoff
 
+> **Update, November 2026.** A full pre-release audit and a fix pass came after this
+> snapshot. `RELEASE_REVIEW.md` is now the current picture: what was found, what was
+> fixed, what still needs you, and the on-device test checklist. Where the two
+> disagree, trust `RELEASE_REVIEW.md`. Notable changes since this was written:
+> `android/` is committed; builds show test ads unless made with
+> `npm run cap:sync:release`; there is no daily card; the answer is no longer shown
+> after a loss; attempts are saved and restored.
+>
+> **Second update, November 2026 (improvements pass).** Phaser is gone: the board is a
+> React/SVG component, so every mention of Phaser below is history. Also new: drag to
+> mark, a guided first solve on level 1, hints that reveal a whole row or column, and a
+> share image plus level links. See section 12 of `RELEASE_REVIEW.md`.
+
 The production infrastructure from the `game-template` repo has been ported into Sumline and
 adapted to its actual shape (web-only prototype → Capacitor-wrapped, monetized, instrumented app).
 This file is the current-state snapshot + the ordered list of the **external** work only you can do.
@@ -41,5 +54,5 @@ The process docs live in `docs/`; the design source of truth is `game-template/P
 
 ## Notes
 
-- `android/` is generated (gitignored) — regenerate anytime with `rm -rf android && npx cap add android && npm run patch:native`.
+- `android/` is committed (it was gitignored when this was first written). Do not delete and regenerate it: signing and Firebase Gradle wiring live there.
 - Everything runs on web with dev stubs/noops, so `npm run dev` is a full preview minus real ads/telemetry.
