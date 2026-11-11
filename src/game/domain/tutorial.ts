@@ -7,7 +7,8 @@ import { GRID_SIZE, GameOutcome } from './types';
 /** The level that teaches the game by walking the player through a first solve. */
 export const TUTORIAL_LEVEL_ID = 0;
 
-// In the order a new player meets them. The first two are read, the rest are done.
+// In the order a new player meets them. The coach only ever points and explains:
+// the board and its buttons stay live throughout, so nothing on screen is dead.
 export enum CoachStep {
   Clues = 'clues',
   SolvedRow = 'solved-row',
@@ -27,8 +28,6 @@ export interface CoachView {
   readonly cells: readonly number[];
   readonly rows: readonly number[];
   readonly cols: readonly number[];
-  /** Only the ringed cells may be touched. */
-  readonly only: boolean;
 }
 
 export interface OpenLine {
@@ -90,7 +89,7 @@ export function coachView(
   forced: OpenLine | null,
 ): CoachView | null {
   if (state.outcome !== GameOutcome.InProgress) return null;
-  const quiet = { cells: [], rows: [], cols: [], only: false } as const;
+  const quiet = { cells: [], rows: [], cols: [] } as const;
 
   if (state.guesses.length > 0) {
     return {
@@ -107,7 +106,6 @@ export function coachView(
       cells: [],
       rows: ALL_LINES,
       cols: ALL_LINES,
-      only: false,
     };
   }
 
@@ -126,9 +124,19 @@ export function coachView(
       cells: solved.cells,
       rows: [solved.index],
       cols: doneCols,
-      only: false,
     };
   }
+
+  const cap = state.puzzle.filledCount;
+  const left = cap - markedCount(state);
+  const ready = {
+    step: CoachStep.Submit,
+    text: `All ${cap} marks are placed. Press Submit to check them.`,
+    ...quiet,
+  };
+  // A player who went their own way and placed every mark is told to submit,
+  // not sent back to the line the coach had in mind.
+  if (left <= 0) return ready;
 
   if (reached <= 2 && forced && !isLineMarked(state, forced)) {
     const isRow = forced.line.axis === LineAxis.Row;
@@ -142,24 +150,14 @@ export function coachView(
       cells: forced.open,
       rows: isRow ? [forced.line.index] : [],
       cols: isRow ? [] : [forced.line.index],
-      only: true,
     };
   }
 
-  const cap = state.puzzle.filledCount;
-  const left = cap - markedCount(state);
-  if (left > 0) {
-    return {
-      step: CoachStep.Place,
-      text:
-        `Now the rest. ${cap} cells are filled in all, so you have ${left} ` +
-        `${left === 1 ? 'mark' : 'marks'} left to place. Let the numbers guide you.`,
-      ...quiet,
-    };
-  }
   return {
-    step: CoachStep.Submit,
-    text: `All ${cap} marks are placed. Press Submit to check them.`,
+    step: CoachStep.Place,
+    text:
+      `Now the rest. ${cap} cells are filled in all, so you have ${left} ` +
+      `${left === 1 ? 'mark' : 'marks'} left to place. Let the numbers guide you.`,
     ...quiet,
   };
 }

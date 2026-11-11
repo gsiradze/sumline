@@ -6,7 +6,7 @@ import { useKeepAwake } from '../hooks/useKeepAwake';
 import { useRetry } from '../hooks/useRetry';
 import { Board } from './Board';
 import type { BoardSpotlight } from './Board';
-import { layout } from './boardLayout';
+import { boardSizeVars } from './boardLayout';
 import { SubmitButton } from './SubmitButton';
 import { BeaverOverlay } from './BeaverOverlay';
 import { LastGuessSummary } from './LastGuessSummary';
@@ -106,9 +106,13 @@ export function LevelGameView({
   // Level 1 teaches a new player by walking them through it (see tutorial.ts).
   const [coaching, setCoaching] = useState(false);
   const [coachReached, setCoachReached] = useState(0);
-  const forcedLine = useMemo(
-    () => (level.id === TUTORIAL_LEVEL_ID ? findForcedLine(freshGame(level)) : null),
+  const tutorialStart = useMemo(
+    () => (level.id === TUTORIAL_LEVEL_ID ? freshGame(level) : null),
     [level],
+  );
+  const forcedLine = useMemo(
+    () => (tutorialStart ? findForcedLine(tutorialStart) : null),
+    [tutorialStart],
   );
 
   useEffect(() => {
@@ -171,12 +175,20 @@ export function LevelGameView({
   const coachReading =
     coach !== null && (coach.step === CoachStep.Clues || coach.step === CoachStep.SolvedRow);
   const forcedLineDone = forcedLine === null || isLineMarked(game.state, forcedLine);
+  // The coach never locks the board. A player who starts marking while it is
+  // still explaining has plainly read enough: it moves on with them.
+  const startedPlaying =
+    tutorialStart !== null &&
+    (markedCount(game.state) !== markedCount(tutorialStart) ||
+      game.state.emptyNotes.includes(true));
   useEffect(() => {
-    // Once the certain line is filled in, the board is the player's for good.
-    if (coaching && coachReached === COACH_READING_STEPS && forcedLineDone) {
+    if (!coaching) return;
+    if (coachReached < COACH_READING_STEPS && startedPlaying) {
+      setCoachReached(COACH_READING_STEPS);
+    } else if (coachReached === COACH_READING_STEPS && forcedLineDone) {
       setCoachReached(COACH_READING_STEPS + 1);
     }
-  }, [coaching, coachReached, forcedLineDone]);
+  }, [coaching, coachReached, startedPlaying, forcedLineDone]);
   useEffect(() => {
     if (coaching && game.state.outcome === GameOutcome.Won) handleDismissIntro(false);
   }, [coaching, game.state.outcome, handleDismissIntro]);
@@ -288,7 +300,7 @@ export function LevelGameView({
 
   const { indexInBatch, batchIndexInTier } = coordsForLevelId(level.id);
   const tip = level.id < TEACHING_TIPS.length ? TEACHING_TIPS[level.id] : level.teachingHint;
-  const inputBlocked = rules !== null || adBusy || !game.hydrated || coachReading;
+  const inputBlocked = rules !== null || adBusy || !game.hydrated;
   const coachSpotlight =
     coach && coach.cells.length + coach.rows.length + coach.cols.length > 0 ? coach : null;
   const marked = markedCount(game.state);
@@ -348,11 +360,8 @@ export function LevelGameView({
         !isTerminal && tip && <TeachingHint hint={tip} />
       )}
 
-      <div className="flex justify-center px-3">
-        <div
-          className="relative w-full max-w-md mx-auto"
-          style={{ aspectRatio: `${layout.width} / ${layout.height}` }}
-        >
+      <div className="px-3">
+        <div className="board-box" style={boardSizeVars(Boolean(tip))}>
           <Board
             state={game.state}
             tool={markMode}

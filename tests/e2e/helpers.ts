@@ -77,6 +77,11 @@ export async function openLevel(page: Page, id: number): Promise<void> {
 }
 
 export async function getState(page: Page): Promise<TestState> {
+  // The hook reports the state as last drawn. Let a frame pass first, so an
+  // action sent just before this is included (Safari draws a moment later than Chrome).
+  await page.evaluate(
+    () => new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0))),
+  );
   const s = await page.evaluate(() => window.__gridTest!.getState());
   if (!s) throw new Error('state not available');
   return s;

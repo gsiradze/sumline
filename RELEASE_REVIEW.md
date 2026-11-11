@@ -787,17 +787,18 @@ There is no purchase or restore to test: the app has no in-app purchases.
 
 ## 12. Improvements pass
 
-Five changes made after section 10, at your request, and one that was built and then taken out. Nothing was committed.
+Changes made after section 10, at your request, and one that was built and then taken out.
 
 **Verified on this machine after the last change**
 
 | Check | Result |
 |---|---|
 | Typecheck, lint | Pass, 0 warnings |
-| Unit tests | 235/235 (was 185), 97% line coverage of the game logic |
-| e2e | 28/28 (was 14), now with real taps, drags and holds on the board |
+| Unit tests | 243/243 (was 185), 97% line coverage of the game logic |
+| e2e | 37/37 (was 14), now with real taps, drags and holds on the board, music and layout |
+| The same suite in Safari's engine | 36/37; the one failure is a clipboard permission that engine's test driver lacks |
 | `npm run check:levels` | 210 levels valid, no duplicates, 8,400 random playouts consistent |
-| Production build | Pass. 1.2 MB (was 2.5 MB); JavaScript 0.4 MB (was about 1.7 MB) |
+| Production build | Pass. 1.3 MB including the music (was 2.5 MB); JavaScript 0.4 MB (was about 1.7 MB) |
 | Headless browser, production build | 180/180 checks on four phone sizes, no console errors |
 | `npm run cap:sync` | Pass |
 
@@ -809,9 +810,11 @@ Five changes made after section 10, at your request, and one that was built and 
 |---|---|---|
 | Board without a game engine | The same board, drawn as SVG by React. Phaser is removed. Nothing runs per frame any more. | `src/ui/components/Board.tsx`, `boardLayout.ts` |
 | Drag to mark | Drag across cells to mark them; start on a marked cell to erase. Hold, then drag, to pencil several dashes. A drag never overwrites a dash with a mark or a mark with a dash. | `src/game/domain/stroke.ts` |
-| Guided tutorial | A new player's level 1 is a walked-through solve: read the clues, see the solved row, fill the one certain row, place the rest, read the result. "Skip tutorial" is always there. It runs once. | `src/game/domain/tutorial.ts`, `TutorialCoach.tsx` |
+| Guided tutorial | A new player's level 1 is a walked-through solve: read the clues, see the solved row, fill the one certain row, place the rest, read the result. Nothing is locked while it runs, and it follows a player who just starts marking. "Skip tutorial" is always there. It runs once. | `src/game/domain/tutorial.ts`, `TutorialCoach.tsx` |
 | Line hints | One ad reveals a whole row or column: the one whose open cells could be arranged in the most ways. | `src/game/domain/hint.ts` |
 | Stars in Expert and Master | A win on the last (third) guess is 2★. It was 1★. | `src/game/domain/tiers.ts` |
+| Bigger board | The grid now runs from the row numbers to the same right edge as the buttons, so cells are about 16% larger wherever the screen has room (47 → 55 px on a 440-wide phone, 38 → 44 px on a 360-wide one). On a screen too short for everything, the board narrows instead of pushing Submit off screen. | `boardLayout.ts`, `.board-box` in `globals.css` |
+| Background music | The 14.5-second loop you supplied plays on every screen from the first touch. Settings has a Music switch; Sound off silences it too. Nothing plays while the app is in the background or under a full-screen ad. | `src/game/audio/music.ts` |
 | Share image and links | Where the share sheet takes files, a picture of the unsolved puzzle with the result. The link opens that level on the web version when `VITE_WEB_URL` is set. `?level=37` opens level 37. | `src/ui/shareCard.ts`, `src/platform/deepLink.ts` |
 
 ### Difficulty: tried, and taken out
@@ -859,10 +862,26 @@ For reference, should you ever want it, this is what pre-solved cells do to leve
 
 **Tutorial**
 - [ ] Fresh install, tap PLAY: level 1 opens with the coach, not with pages of rules.
-- [ ] During the first two steps the board does not react; "Next" moves on.
-- [ ] On "Your turn" only the highlighted row reacts; dragging across it moves the coach on.
+- [ ] Nothing is ever locked: tapping a cell or Submit works from the first second, and marking a cell moves the coach on.
+- [ ] On "Your turn" the suggested row is ringed; dragging across it moves the coach on.
 - [ ] Win level 1: the coach is gone for good. Fresh install, "Skip tutorial": same.
 - [ ] On the smallest phone the coach card, the board and the Submit button can all be reached.
+
+**Music** ★
+- [ ] Music starts on the first touch and loops with no click or gap (listen through at least three passes).
+- [ ] It is quieter than the tap sounds, and both are comfortable at half volume. If not, change `MUSIC_VOLUME` in `src/game/audio/music.ts`.
+- [ ] Press Home, lock the phone, take a call: the music stops at once, and comes back when you return.
+- [ ] Watch a rewarded ad and an interstitial: no game music under the ad; it returns after.
+- [ ] Settings → Music off: silence, and still off after restarting the app. Sound off: everything silent.
+- [ ] Start a song in another app, then open the game: decide whether the game's music over it is acceptable.
+
+**Board size**
+- [ ] The grid's right edge lines up with the Submit button, and the row numbers with the "N of M marked" text.
+- [ ] On the smallest phone you have: Submit is on screen without scrolling on an ordinary level.
+
+**iPad and Safari (web version)**
+- [ ] On a fresh iPad, PLAY then tap cells and Submit straight away: everything responds.
+- [ ] Drag across cells with a finger: the page does not scroll and every cell crossed is marked.
 
 **Sharing**
 - [ ] Share from the win screen in the app: the share sheet opens with the text and link.

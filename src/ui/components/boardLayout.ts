@@ -1,16 +1,39 @@
+import type { CSSProperties } from 'react';
 import { GRID_SIZE } from '../../game/domain/types';
 
 // The board is drawn in these units and scaled to the screen by its viewBox.
+// The grid fills the box: only the clue numbers sit to its left and above it,
+// and its right edge lines up with the buttons below. Every unit of margin
+// here is a unit the cells cannot use on a phone.
 export const layout = {
-  width: 500,
-  height: 460,
+  width: 432,
+  height: 442,
   cellSize: 58,
   cellGap: 8,
   cellRadius: 6,
-  clueGutter: 38,
+  // From the grid's edge to the middle of a clue number.
+  clueGutter: 30,
   clueFontSize: 22,
-  gridOriginY: 56,
+  gridOriginX: 40,
+  gridOriginY: 46,
 } as const;
+
+// The narrowest the board may get, as a share of the column it sits in, on a
+// screen too short for the whole level: a cell plus its gap is then still a
+// 44 px touch target on a 360 px-wide phone.
+const BOARD_FLOOR = 0.864;
+
+// Height of the tip shown above the board on the tutorial levels (two lines of text).
+const TIP_HEIGHT_PX = 76;
+
+/** Read by `.board-box` in globals.css, which sizes the board to the screen. */
+export function boardSizeVars(hasTip: boolean): CSSProperties {
+  return {
+    '--board-ratio': String(layout.width / layout.height),
+    '--board-floor': String(BOARD_FLOOR),
+    '--board-above': hasTip ? `${TIP_HEIGHT_PX}px` : '0px',
+  } as CSSProperties;
+}
 
 export const motion = {
   wrongFlashMs: 520,
@@ -19,8 +42,7 @@ export const motion = {
 
 export const CELL_PITCH = layout.cellSize + layout.cellGap;
 
-const GRID_SPAN = GRID_SIZE * layout.cellSize + (GRID_SIZE - 1) * layout.cellGap;
-export const GRID_ORIGIN_X = Math.round((layout.width - GRID_SPAN) / 2);
+export const GRID_ORIGIN_X = layout.gridOriginX;
 export const GRID_ORIGIN_Y = layout.gridOriginY;
 
 export interface BoardPoint {
