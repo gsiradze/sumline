@@ -33,8 +33,9 @@ const config: CapacitorConfig = {
       backgroundColor: '#FAF6F0',
       overlaysWebView: false,
     },
-    // Dark status and navigation icons whatever the system theme: the app is
-    // always light paper.
+    // How the bars start, before the page has loaded: dark icons for the light
+    // paper of the launch screen. From then on setSystemBarsTheme() in
+    // src/platform/native.ts matches them to the theme on screen.
     SystemBars: {
       style: 'LIGHT',
     },

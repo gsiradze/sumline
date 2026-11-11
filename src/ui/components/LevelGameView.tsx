@@ -18,7 +18,7 @@ import { TeachingHint } from './TeachingHint';
 import { TutorialCoach } from './TutorialCoach';
 import { WinScreen } from './WinScreen';
 import { RetryGate } from './RetryGate';
-import { ArrowLeftIcon, QuestionIcon } from './icons';
+import { ArrowLeftIcon, GearIcon, QuestionIcon } from './icons';
 import { getRulesShown, setRulesShown } from '../../storage/persistence';
 import { adProvider } from '../../storage/ads';
 import { currentSessionCount, noteAdShown } from '../../storage/adSession';
@@ -62,6 +62,7 @@ interface LevelGameViewProps {
   readonly onBack: () => void;
   /** Resolves false when the app did not move on (the level screen stays up). */
   readonly onGotoLevel: (levelId: number, opts?: { readonly skipAd?: boolean }) => Promise<boolean>;
+  readonly onOpenSettings: () => void;
 }
 
 // One line per tutorial level. Each is true of every puzzle, not just this one.
@@ -75,6 +76,11 @@ const TEACHING_TIPS: readonly string[] = [
   'No easy lines in this one. Make a careful first guess, then work from what locks in.',
 ];
 
+// Header buttons. Below 360 px wide everything in the header tightens a little
+// so four controls and the title still fit (tests/e2e/layout.spec.ts).
+const HEADER_BUTTON =
+  'w-11 h-11 max-[359px]:w-10 max-[359px]:h-10 rounded-[10px] border border-rule-200 bg-paper-50 flex items-center justify-center active:scale-95 transition-transform duration-nudge';
+
 const NOTICE_MS = 2800;
 const HINT_SPOTLIGHT_MS = 1800;
 
@@ -86,6 +92,7 @@ export function LevelGameView({
   onRecordStatsLoss,
   onBack,
   onGotoLevel,
+  onOpenSettings,
 }: LevelGameViewProps) {
   const game = useGameState(level);
   useAudioFx(game.state, game.hydrated);
@@ -308,34 +315,49 @@ export function LevelGameView({
 
   return (
     <main className="screen-min-h flex flex-col font-sans text-ink-900 bg-paper-100">
-      <header className="px-4 pt-3 pb-3 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={handleHeaderBack}
-          aria-label="Back to levels"
-          className="w-11 h-11 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-700 flex items-center justify-center active:scale-95 transition-transform duration-nudge shrink-0"
-        >
-          <ArrowLeftIcon className="w-[18px] h-[18px]" />
-        </button>
+      <header className="px-4 max-[359px]:px-3 pt-3 pb-3 flex items-center justify-between gap-3 max-[359px]:gap-2">
+        <div className="flex items-center gap-2 max-[359px]:gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleHeaderBack}
+            aria-label="Back to levels"
+            className={`${HEADER_BUTTON} text-ink-700`}
+          >
+            <ArrowLeftIcon className="w-[18px] h-[18px]" />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            aria-label="Settings"
+            className={`${HEADER_BUTTON} text-ink-500 hover:text-ink-900`}
+          >
+            <GearIcon className="w-[18px] h-[18px]" />
+          </button>
+        </div>
         <div className="flex-1 text-center min-w-0">
-          <div className="font-mono text-[10px] tracking-[0.12em] uppercase text-ink-500 whitespace-nowrap">
-            {config.label} · {batchIndexInTier + 1}.{indexInBatch + 1}
+          {/* One line high: where the set and level do not fit beside the tier
+              name they wrap out of sight, and the name stays centred. */}
+          <div className="h-[15px] overflow-hidden flex flex-wrap justify-center font-mono text-[10px] leading-[15px] tracking-[0.12em] uppercase text-ink-500 whitespace-nowrap">
+            <span>{config.label}</span>
+            <span>
+              {'\u00A0'}· {batchIndexInTier + 1}.{indexInBatch + 1}
+            </span>
           </div>
-          <h1 className="font-serif text-[22px] font-medium leading-[1.15] tracking-[-0.01em] text-ink-900 mt-0.5">
+          <h1 className="font-serif text-[22px] max-[359px]:text-[20px] font-medium leading-[1.15] tracking-[-0.01em] text-ink-900 mt-0.5">
             Level {level.id + 1}
           </h1>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 max-[359px]:gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => setRules('reference')}
             aria-label="Show rules"
-            className="w-11 h-11 rounded-[10px] border border-rule-200 bg-paper-50 text-ink-500 hover:text-ink-900 flex items-center justify-center active:scale-95 transition-transform duration-nudge"
+            className={`${HEADER_BUTTON} text-ink-500 hover:text-ink-900`}
           >
             <QuestionIcon className="w-[18px] h-[18px]" />
           </button>
           <div
-            className="h-11 min-w-[52px] px-2.5 rounded-[10px] border border-rule-200 bg-paper-50 flex items-center justify-center"
+            className="h-11 max-[359px]:h-10 min-w-[52px] max-[359px]:min-w-[46px] px-2.5 max-[359px]:px-2 rounded-[10px] border border-rule-200 bg-paper-50 flex items-center justify-center"
             aria-label={`${remaining} of ${level.guessBudget} guesses remaining`}
           >
             <span className="inline-flex items-baseline gap-[2px] leading-none">
@@ -429,8 +451,10 @@ export function LevelGameView({
       {notice !== null && (
         <div
           role="status"
-          className="fixed left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-32px)] px-4 py-2 rounded-full bg-fill-800 text-paper-50 font-sans text-[13px] shadow-sh-3 text-center"
-          style={{ top: 'calc(var(--safe-top) + 72px)' }}
+          className="fixed left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-32px)] px-4 py-2 rounded-full bg-fill-800 text-paper-50 font-sans text-[13px] shadow-sh-3 text-center pointer-events-none"
+          // Over the title, which can spare the space for a moment. Any lower and
+          // it would cover the column numbers a hint has just highlighted.
+          style={{ top: 'calc(var(--safe-top) + 17px)' }}
         >
           {notice}
         </div>

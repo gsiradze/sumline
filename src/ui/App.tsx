@@ -29,8 +29,10 @@ import { canShowInterstitial, noteAdShown, noteLevelComplete } from '../storage/
 import { bakedLevel } from '../storage/levelsManifest';
 import { isLevelAccessible, tierForLevelId } from '../game/domain/levels';
 import type { Tier } from '../game/domain/types';
+import { Theme } from '../platform/theme';
 import { useProgress } from './hooks/useProgress';
 import { useStats } from './hooks/useStats';
+import { useTheme } from './hooks/useTheme';
 import { registerNav } from '../testHook';
 
 const MAX_BANNER_RESERVE_PX = 120;
@@ -91,6 +93,7 @@ function Game() {
   const [splashing, setSplashing] = useState(shouldShowSplash);
   const { progress, recordLevelWin } = useProgress();
   const { stats, hydrated: statsHydrated, onWin: onStatsWin, onLoss: onStatsLoss } = useStats();
+  const { theme, toggleTheme } = useTheme();
   const [muted, setMutedState] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
@@ -192,6 +195,8 @@ function Game() {
     settingChanged('music', next);
   }, []);
 
+  const handleOpenSettings = useCallback(() => setSettingsOpen(true), []);
+
   const handlePickTier = useCallback((tier: Tier) => {
     setView({ kind: 'tier', tier });
   }, []);
@@ -273,10 +278,12 @@ function Game() {
         progress={progress}
         muted={muted}
         onToggleMute={handleToggleMute}
+        darkTheme={theme === Theme.Dark}
+        onToggleTheme={toggleTheme}
         onPickTier={handlePickTier}
         onPickLevel={handlePickLevel}
         onOpenStats={() => setStatsOpen(true)}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={handleOpenSettings}
       />
     );
   } else if (view.kind === 'tier') {
@@ -299,6 +306,7 @@ function Game() {
         onRecordStatsLoss={onStatsLoss}
         onBack={handleBackToTier}
         onGotoLevel={handleAdvanceLevel}
+        onOpenSettings={handleOpenSettings}
       />
     );
   }
@@ -317,6 +325,8 @@ function Game() {
           onToggleMusic={handleToggleMusic}
           hapticsOn={hapticsOn}
           onToggleHaptics={handleToggleHaptics}
+          darkTheme={theme === Theme.Dark}
+          onToggleTheme={toggleTheme}
           stats={stats}
           onDismiss={() => setSettingsOpen(false)}
         />

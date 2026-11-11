@@ -71,6 +71,7 @@ src/
     back.ts                  # Back-handler stack: overlays first, then screens, then leave the app
     consent.ts               # UMP consent; nothing ad-related runs until it allows ad requests
     deepLink.ts              # `?level=37` links: parse on arrival, build for sharing
+    theme.ts                 # Light or dark: the player's choice, else the device's setting
     share.ts, review.ts, notifications.ts, keepAwake.ts
   storage/
     persistence.ts           # Capacitor Preferences (native) / localStorage (web): progress,
@@ -89,11 +90,11 @@ src/
                              # StatsModal, SettingsModal, GetAppModal, Splash, Wordmark,
                              # ErrorBoundary, icons
     hooks/                   # useGameState, useStats, useProgress, useRetry, useAudioFx,
-                             # useBackHandler, useKeepAwake
+                             # useBackHandler, useKeepAwake, useTheme
   dev/
     CaptureStage.tsx         # Recording stage for short-form video. Dev builds only.
   styles/
-    globals.css              # Tailwind directives + design-system CSS custom properties
+    globals.css              # Tailwind directives + every colour, for the light and dark themes
   main.tsx                   # React entry
 scripts/
   build-levels.ts            # Bakes the 210 levels → public/levels.json (manual only; frozen)
@@ -171,6 +172,16 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 - **Settings.** "Sound" off silences everything; "Music" only chooses whether the tune plays (`grid:v2:musicOff`; on by default).
 - **Background.** All audio is suspended while the app is in the background (`sound.pause()` in `main.tsx`). That is also what silences it under a full-screen ad, which puts the app behind it.
 - **Level.** `MUSIC_VOLUME` in `music.ts` was set from measurement to sit just under the tap sounds. Nobody has listened to the mix on a phone yet.
+
+## Themes
+
+- **Two themes, one set of names.** Every colour is a CSS variable in `globals.css`: `:root` holds the light values, `.dark` the dark ones. Components use the Tailwind names (`bg-paper-50`, `text-ink-900`) and need no theme logic. `dark` is put on `<html>` by a few lines in `index.html` before the first paint, so a dark-theme player never sees a light flash, and by `src/platform/theme.ts` after that. A unit test keeps the two in step.
+- **Which theme.** The device's setting until the player uses the switch (the sun or moon on the home screen, or "Dark theme" in Settings). After that it is their choice, saved as `grid:v2:theme`. In the app a copy is kept in localStorage, the only store `index.html` can read at once.
+- **The light theme's colours are the owner's.** On 2026-11-12 they asked for a dark theme and said, in their words, "keep white mode with this colors". Do not change a light value. The check used then: screenshot every screen before and after and compare pixel by pixel.
+- **The dark palette is held to published guidance by a test** (`src/styles/__tests__/darkPalette.test.ts`): a dark grey page, not black; cream text, not white; text at least 4.5:1 against what it sits on; raised surfaces lighter, because shadows do not show. Sources: Apple's Dark Mode guidelines, Google's Material dark theme, WCAG 2.2. The comment above `.dark` explains the scales.
+- **Not everything flips.** In dark the accent scales run the other way round (700 is the pale shade used for text, 100 the deep tint). Anything drawn as an object keeps fixed colours instead: the PLAY button, the mascot, the edge of the tier buttons (`--pin-edge`). The share image is always the light one.
+- **Traps.** An opacity suffix on these names (`bg-paper-50/70`, `text-ochre-500/25`) generates no CSS at all: the colours are plain `var()` values and Tailwind 3 cannot add alpha to them. Sixteen such classes exist and do nothing; making them work would change the light theme, so they were left. Do not add more. For a difference that applies in dark only, use a `dark:` variant.
+- **Native.** `setSystemBarsTheme()` in `native.ts` switches the status and navigation bar icons with the theme. The launch screen is native and shows before any of this runs, so it follows the phone, not the player's choice: a dark one needs `assets/splash-dark.png`.
 
 ## Conventions
 

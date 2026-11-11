@@ -61,7 +61,7 @@ npm run version:apply      # sync app version from package.json to native projec
 
 ### Recording gameplay (dev only)
 
-`http://localhost:8080/?capture=1&level=12&autoplay=1` shows only the board in a 9:16 frame on a clean background and plays a scripted two-guess solve. Options: `level` (1–210), `autoplay=1`, `speed` (0.25–4), `label=0` to hide the wordmark. Keys: Enter/Space submit, R restart, ←/→ change level, A toggle autoplay. The stage is not part of production builds.
+`http://localhost:8080/?capture=1&level=12&autoplay=1` shows only the board in a 9:16 frame on a clean background and plays a scripted two-guess solve. Options: `level` (1–210), `autoplay=1`, `speed` (0.25–4), `label=0` to hide the wordmark. Keys: Enter/Space submit, R restart, ←/→ change level, A toggle autoplay. The stage is not part of production builds. It is drawn in whichever theme the game last showed in that browser, light or dark: switch on the home screen before recording.
 
 ## Project layout
 
@@ -71,6 +71,7 @@ See [CLAUDE.md](./CLAUDE.md) for the full stack, architecture, and conventions. 
 - `src/game/audio/` — tap sounds, the background music loop, and haptics. Music plays `public/audio/music.m4a`; see `assets/README.md` for how to replace it.
 - `src/ui/` — everything on screen in React, including the board (an SVG component that draws domain state and turns touches into moves).
 - `src/storage/`, `src/platform/`, `src/telemetry/`, `src/config/` — async persistence, native helpers, Firebase telemetry, and env/AdMob config.
+- `src/styles/globals.css` — every colour, for the light theme and the dark one. See "Themes" in CLAUDE.md before changing any.
 - `scripts/build-levels.ts` — bakes the 210-level ladder into `public/levels.json` (committed, frozen).
 - `RELEASE_REVIEW.md` — the pre-release audit, what was fixed, and the on-device test checklist.
 

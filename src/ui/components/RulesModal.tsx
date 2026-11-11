@@ -128,7 +128,7 @@ function RulesSheet({ onDismiss }: { readonly onDismiss: () => void }) {
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss"
-        className="absolute inset-0 bg-[rgba(20,18,14,0.3)]"
+        className="absolute inset-0 bg-[rgba(20,18,14,0.3)] dark:bg-[rgba(0,0,0,0.6)]"
       />
       <div
         className="relative w-full bg-paper-50 rounded-t-[28px] px-5 pt-2.5 pb-6 overflow-y-auto"

@@ -12,6 +12,23 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Sumline" />
     <title>Sumline — 6×6 deduction puzzle</title>
+    <!-- Sets the theme before anything is drawn, so a dark-theme player never gets a
+         light flash on the way in. The app reads the same choice again once it is
+         running (src/platform/theme.ts); a unit test keeps the two in step. -->
+    <script>
+      (function () {
+        var dark = false;
+        try {
+          var choice = localStorage.getItem('grid:v2:theme');
+          dark =
+            choice === 'dark' ||
+            (choice !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        } catch (e) {}
+        if (!dark) return;
+        document.documentElement.classList.add('dark');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', '#1c1815');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
