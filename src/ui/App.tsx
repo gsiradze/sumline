@@ -30,7 +30,7 @@ import { adResult, settingChanged, tutorialComplete } from '../telemetry/events'
 import { adProvider } from '../storage/ads';
 import { canShowInterstitial, noteAdShown, noteLevelComplete } from '../storage/adSession';
 import { bakedLevel } from '../storage/levelsManifest';
-import { isLevelAccessible, tierForLevelId } from '../game/domain/levels';
+import { firstIncompleteLevelId, isLevelAccessible, tierForLevelId } from '../game/domain/levels';
 import { TUTORIAL_LEVEL_ID } from '../game/domain/tutorial';
 import type { Tier } from '../game/domain/types';
 import { Theme } from '../platform/theme';
@@ -275,6 +275,19 @@ function Game() {
     [openLevel],
   );
 
+  // The prompt can sit over a list in which every level is past the demo, so
+  // "Keep playing the demo" has to lead somewhere playable: the next demo level
+  // not solved yet (the tutorial, on a first visit), or the demo's own level
+  // list once all of it is solved.
+  const handleKeepPlayingDemo = useCallback(() => {
+    setGetAppOpen(false);
+    const limit = demoLevelLimit();
+    if (limit === null) return;
+    const next = firstIncompleteLevelId(progressRef.current);
+    if (next < limit) openLevel(next);
+    else setView({ kind: 'tier', tier: tierForLevelId(0) });
+  }, [openLevel]);
+
   // A shared link (`?level=37`) opens straight on its level. The address is
   // then cleaned, so a reload or the back button behaves as usual.
   useEffect(() => {
@@ -424,7 +437,11 @@ function Game() {
         />
       )}
       {getAppOpen && (
-        <GetAppModal demoLevels={demoLevelLimit() ?? 0} onDismiss={() => setGetAppOpen(false)} />
+        <GetAppModal
+          demoLevels={demoLevelLimit() ?? 0}
+          onKeepPlaying={handleKeepPlayingDemo}
+          onDismiss={() => setGetAppOpen(false)}
+        />
       )}
       {splashing && <Splash onDone={() => setSplashing(false)} />}
     </>

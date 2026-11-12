@@ -5,11 +5,13 @@ import { useBackHandler } from '../hooks/useBackHandler';
 
 interface GetAppModalProps {
   readonly demoLevels: number;
+  /** "Keep playing the demo": has to lead to a level that can be played. */
+  readonly onKeepPlaying: () => void;
   readonly onDismiss: () => void;
 }
 
 /** Shown on the web build only, where the game is a demo of the first levels. */
-export function GetAppModal({ demoLevels, onDismiss }: GetAppModalProps) {
+export function GetAppModal({ demoLevels, onKeepPlaying, onDismiss }: GetAppModalProps) {
   useBackHandler(onDismiss, BACK_PRIORITY_OVERLAY);
   return (
     <div
@@ -44,7 +46,7 @@ export function GetAppModal({ demoLevels, onDismiss }: GetAppModalProps) {
         </a>
         <button
           type="button"
-          onClick={onDismiss}
+          onClick={onKeepPlaying}
           className="mt-2 w-full h-11 rounded-[12px] font-sans text-[14px] font-medium text-ink-700"
         >
           Keep playing the demo

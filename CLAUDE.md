@@ -65,7 +65,7 @@ src/
     env.ts                   # AdMob IDs and ads mode (test by default, live only in release builds)
     links.ts                 # Store URL, privacy policy URL, support email, web version URL
     version.ts               # App version, injected from package.json
-    demo.ts                  # Web build is a demo capped at the first 14 levels
+    demo.ts                  # Web build is a demo capped at the first 14 levels (`?demo` in dev)
   platform/
     native.ts                # Capacitor bootstrap, Android back button, foreground events
     back.ts                  # Back-handler stack: overlays first, then screens, then leave the app
@@ -156,6 +156,7 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 - **Hints**: 1 rewarded ad = 1 hint. A hint reveals a whole row or column: the one whose open cells could still be arranged in the most ways (`findHintLine`). The line is chosen when the ad pays out, from the board as it is then.
 - **Sharing**: the win screen shares the emoji result plus a link. Where the platform's share sheet takes files (mobile browsers), a 1080×1350 image of the unsolved puzzle with the result goes with it (`shareCard.ts`). In the Android app it is text and link only: handing an image to the native share sheet needs `@capacitor/filesystem`, which is not installed. The link is `VITE_WEB_URL/?level=N` when that is set, the store listing otherwise; the web version opens `?level=N` directly on that level.
 - **Ads**: banner app-wide (never before a new player has finished the tutorial), interstitial only on an explicit "Next" tap per `adPolicy.ts`, rewarded for hints and retries. The layout reserves banner height + safe area + a gap (`--bottom-reserve` in `globals.css`); no control may sit inside it.
+- **Web demo**: the public web build stops after level 14 (`demo.ts`); the app has no limit. A level past it raises the "get the app" prompt instead of opening, whichever way it was asked for: a card in a level list, a shared link, "Next" after level 14, PLAY once all 14 are solved. Four of the five tiers lie wholly past the demo and their lists do not say so, so the prompt's "Keep playing the demo" must lead somewhere playable: it opens the lowest unsolved demo level (the tutorial, on a first visit), or the Beginner list once all 14 are solved. Until 2026-11-12 it only closed the prompt, and the owner, trying the site as a new visitor, could not start a game. **The dev server has no limit either**, which is how that went unseen: add `?demo` to its address to get the demo, and give any change to how levels are opened a test in `tests/e2e/demo.spec.ts`.
 
 ## Tutorial
 
