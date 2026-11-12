@@ -4,6 +4,7 @@ import { useAudioFx } from '../hooks/useAudioFx';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { useKeepAwake } from '../hooks/useKeepAwake';
 import { useRetry } from '../hooks/useRetry';
+import { useTutorial } from '../hooks/useTutorial';
 import { Board } from './Board';
 import type { BoardSpotlight } from './Board';
 import { boardSizeVars } from './boardLayout';
@@ -15,11 +16,10 @@ import type { MarkMode } from './MarkModeToggle';
 import { RulesModal } from './RulesModal';
 import { HintButton } from './HintButton';
 import { TeachingHint } from './TeachingHint';
-import { TutorialCoach } from './TutorialCoach';
+import { TutorialTour } from './TutorialTour';
 import { WinScreen } from './WinScreen';
 import { RetryGate } from './RetryGate';
 import { ArrowLeftIcon, GearIcon, QuestionIcon } from './icons';
-import { getRulesShown, setRulesShown } from '../../storage/persistence';
 import { adProvider } from '../../storage/ads';
 import { currentSessionCount, noteAdShown } from '../../storage/adSession';
 import {
@@ -30,21 +30,13 @@ import {
   levelQuit,
   levelStart,
   tutorialBegin,
-  tutorialComplete,
 } from '../../telemetry/events';
 import { maybeRequestReview } from '../../platform/review';
-import { GameOutcome } from '../../game/domain/types';
+import { GRID_SIZE, GameOutcome } from '../../game/domain/types';
 import { guessesRemaining, markedCount } from '../../game/domain/game-state';
 import { LineAxis, findHintLine } from '../../game/domain/hint';
 import { starsForWin } from '../../game/domain/stars';
-import {
-  COACH_READING_STEPS,
-  CoachStep,
-  TUTORIAL_LEVEL_ID,
-  coachView,
-  findForcedLine,
-  isLineMarked,
-} from '../../game/domain/tutorial';
+import { TUTORIAL_LEVEL_ID, tourTargets } from '../../game/domain/tutorial';
 import type { Stars } from '../../game/domain/stars';
 import { coordsForLevelId, isLevelAccessible, progressForLevel } from '../../game/domain/levels';
 import type { LevelProgressMap } from '../../game/domain/levels';
@@ -63,6 +55,13 @@ interface LevelGameViewProps {
   /** Resolves false when the app did not move on (the level screen stays up). */
   readonly onGotoLevel: (levelId: number, opts?: { readonly skipAd?: boolean }) => Promise<boolean>;
   readonly onOpenSettings: () => void;
+  /** This is level 1 and the player has not had the guided first solve yet: run it. */
+  readonly runTutorial: boolean;
+  readonly onTutorialEnd: (skipped: boolean) => void;
+  /** Takes the player to level 1 and runs the guided first solve again. */
+  readonly onReplayTutorial: () => void;
+  /** The level a new player was headed for when the tutorial came first: "Next" leads there. */
+  readonly resumeLevelId: number | null;
 }
 
 // One line per tutorial level. Each is true of every puzzle, not just this one.
@@ -93,6 +92,10 @@ export function LevelGameView({
   onBack,
   onGotoLevel,
   onOpenSettings,
+  runTutorial,
+  onTutorialEnd,
+  onReplayTutorial,
+  resumeLevelId,
 }: LevelGameViewProps) {
   const game = useGameState(level);
   useAudioFx(game.state, game.hydrated);
@@ -104,41 +107,22 @@ export function LevelGameView({
   progressRef.current = progress;
   const gameStateRef = useRef(game.state);
   gameStateRef.current = game.state;
-  const [rules, setRules] = useState<'intro' | 'reference' | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [markMode, setMarkMode] = useState<MarkMode>('mark');
   const [adBusy, setAdBusy] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [hinted, setHinted] = useState<BoardSpotlight | null>(null);
   // Level 1 teaches a new player by walking them through it (see tutorial.ts).
-  const [coaching, setCoaching] = useState(false);
-  const [coachReached, setCoachReached] = useState(0);
+  const tourBegun = useRef(false);
   const tutorialStart = useMemo(
     () => (level.id === TUTORIAL_LEVEL_ID ? freshGame(level) : null),
     [level],
-  );
-  const forcedLine = useMemo(
-    () => (tutorialStart ? findForcedLine(tutorialStart) : null),
-    [tutorialStart],
   );
 
   useEffect(() => {
     mountedAtRef.current = Date.now();
     levelStart(level.id);
-  }, [level.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getRulesShown().then(shown => {
-      if (cancelled || shown) return;
-      // A new player who opens some other level first gets the short rules instead.
-      if (level.id === TUTORIAL_LEVEL_ID) setCoaching(true);
-      else setRules('intro');
-      tutorialBegin();
-    });
-    return () => {
-      cancelled = true;
-    };
   }, [level.id]);
 
   useEffect(() => {
@@ -164,41 +148,6 @@ export function LevelGameView({
       }),
     [game.onCellTapped, game.onCellNoted, game.submit, game.restart],
   );
-
-  const handleDismissIntro = useCallback((skipped: boolean) => {
-    setRules(null);
-    setCoaching(false);
-    void setRulesShown(true);
-    tutorialComplete(skipped);
-    // The banner stays off until a new player has finished the tutorial.
-    void adProvider.showBanner();
-  }, []);
-
-  const handleDismissReference = useCallback(() => {
-    setRules(null);
-  }, []);
-
-  const coach = coaching ? coachView(game.state, coachReached, forcedLine) : null;
-  const coachReading =
-    coach !== null && (coach.step === CoachStep.Clues || coach.step === CoachStep.SolvedRow);
-  const forcedLineDone = forcedLine === null || isLineMarked(game.state, forcedLine);
-  // The coach never locks the board. A player who starts marking while it is
-  // still explaining has plainly read enough: it moves on with them.
-  const startedPlaying =
-    tutorialStart !== null &&
-    (markedCount(game.state) !== markedCount(tutorialStart) ||
-      game.state.emptyNotes.includes(true));
-  useEffect(() => {
-    if (!coaching) return;
-    if (coachReached < COACH_READING_STEPS && startedPlaying) {
-      setCoachReached(COACH_READING_STEPS);
-    } else if (coachReached === COACH_READING_STEPS && forcedLineDone) {
-      setCoachReached(COACH_READING_STEPS + 1);
-    }
-  }, [coaching, coachReached, startedPlaying, forcedLineDone]);
-  useEffect(() => {
-    if (coaching && game.state.outcome === GameOutcome.Won) handleDismissIntro(false);
-  }, [coaching, game.state.outcome, handleDismissIntro]);
 
   useEffect(() => {
     if (!game.hydrated || recordedRef.current) return;
@@ -229,6 +178,22 @@ export function LevelGameView({
     mountedAtRef.current = Date.now();
     restart();
   }, [restart]);
+
+  const tutorial = useTutorial({
+    state: game.state,
+    start: tutorialStart,
+    onRestart: handleRetry,
+    onNote: game.onCellNoted,
+    onEnd: onTutorialEnd,
+  });
+  const beginTutorial = tutorial.begin;
+  useEffect(() => {
+    // Not before a saved attempt has loaded: the tour starts from a clean board.
+    if (!runTutorial || !game.hydrated || tourBegun.current) return;
+    tourBegun.current = true;
+    tutorialBegin();
+    beginTutorial();
+  }, [runTutorial, game.hydrated, beginTutorial]);
 
   const applyHint = game.applyHint;
   const handleHint = useCallback(async () => {
@@ -281,12 +246,15 @@ export function LevelGameView({
   const stars: Stars = isWon ? starsForWin(level.tier, used) : 0;
 
   // "Next" only leads somewhere the player may go: the next set stays locked
-  // until this one is complete. The win itself counts toward that.
-  const nextLevelId = level.id + 1 < TOTAL_LEVELS ? level.id + 1 : null;
+  // until this one is complete. The win itself counts toward that. A new player
+  // who was sent here for the tutorial goes on to the level they had picked.
+  const nextLevelId = resumeLevelId ?? (level.id + 1 < TOTAL_LEVELS ? level.id + 1 : null);
   const progressWithWin: LevelProgressMap = isWon
     ? { ...progress, [level.id]: { completed: true, bestGuessCount: used, stars } }
     : progress;
-  const nextOpen = nextLevelId !== null && isLevelAccessible(progressWithWin, nextLevelId);
+  const nextOpen =
+    nextLevelId !== null &&
+    (resumeLevelId !== null || isLevelAccessible(progressWithWin, nextLevelId));
 
   const handleNext = useCallback(() => {
     if (advancing || nextLevelId === null) return;
@@ -307,9 +275,14 @@ export function LevelGameView({
 
   const { indexInBatch, batchIndexInTier } = coordsForLevelId(level.id);
   const tip = level.id < TEACHING_TIPS.length ? TEACHING_TIPS[level.id] : level.teachingHint;
-  const inputBlocked = rules !== null || adBusy || !game.hydrated;
-  const coachSpotlight =
-    coach && coach.cells.length + coach.rows.length + coach.cols.length > 0 ? coach : null;
+  const inputBlocked = rulesOpen || adBusy || !game.hydrated;
+  const tourStep = tutorial.step;
+  const tourSpotlight = tourStep && {
+    // A ring comes off its cell as soon as the cell is marked.
+    cells: tourTargets(tourStep, game.state),
+    rows: tourStep.lines.filter(id => id < GRID_SIZE),
+    cols: tourStep.lines.filter(id => id >= GRID_SIZE).map(id => id - GRID_SIZE),
+  };
   const marked = markedCount(game.state);
   const cap = game.state.puzzle.filledCount;
 
@@ -350,13 +323,14 @@ export function LevelGameView({
         <div className="flex items-center gap-2 max-[359px]:gap-1.5 shrink-0">
           <button
             type="button"
-            onClick={() => setRules('reference')}
+            onClick={() => setRulesOpen(true)}
             aria-label="Show rules"
             className={`${HEADER_BUTTON} text-ink-500 hover:text-ink-900`}
           >
             <QuestionIcon className="w-[18px] h-[18px]" />
           </button>
           <div
+            data-tour="guesses"
             className="h-11 max-[359px]:h-10 min-w-[52px] max-[359px]:min-w-[46px] px-2.5 max-[359px]:px-2 rounded-[10px] border border-rule-200 bg-paper-50 flex items-center justify-center"
             aria-label={`${remaining} of ${level.guessBudget} guesses remaining`}
           >
@@ -372,14 +346,12 @@ export function LevelGameView({
         </div>
       </header>
 
-      {coach ? (
-        <TutorialCoach
-          text={coach.text}
-          onNext={coachReading ? () => setCoachReached(n => n + 1) : null}
-          onSkip={() => handleDismissIntro(true)}
-        />
-      ) : (
-        !isTerminal && tip && <TeachingHint hint={tip} />
+      {!isTerminal && tip && (
+        // The tour says what there is to say, next to what it is about. The tip
+        // keeps its place meanwhile, so the board does not move when the tour ends.
+        <div className={runTutorial || tutorial.active ? 'invisible' : undefined}>
+          <TeachingHint hint={tip} />
+        </div>
       )}
 
       <div className="px-3">
@@ -391,7 +363,9 @@ export function LevelGameView({
             onNote={game.onCellNoted}
             inputDisabled={inputBlocked}
             animate={game.hydrated}
-            spotlight={hinted ?? coachSpotlight}
+            spotlight={hinted ?? tourSpotlight}
+            only={tutorial.only}
+            onRefused={tutorial.nudge}
           />
           <BeaverOverlay state={game.state} levelId={level.id} />
         </div>
@@ -460,9 +434,26 @@ export function LevelGameView({
         </div>
       )}
 
-      {rules === 'intro' && <RulesModal onDismiss={handleDismissIntro} variant="intro" />}
-      {rules === 'reference' && (
-        <RulesModal onDismiss={handleDismissReference} variant="reference" />
+      {tutorial.active && (
+        <TutorialTour
+          step={tourStep}
+          state={game.state}
+          settled={tutorial.settled}
+          nudges={tutorial.nudges}
+          onNudge={tutorial.nudge}
+          onButton={tutorial.onButton}
+          onSkip={tutorial.skip}
+        />
+      )}
+
+      {rulesOpen && (
+        <RulesModal
+          onDismiss={() => setRulesOpen(false)}
+          onReplay={() => {
+            setRulesOpen(false);
+            onReplayTutorial();
+          }}
+        />
       )}
     </main>
   );

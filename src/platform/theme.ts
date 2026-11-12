@@ -18,29 +18,13 @@ export function parseTheme(raw: string | null): Theme | null {
   return raw === Theme.Light || raw === Theme.Dark ? raw : null;
 }
 
-/** The player's choice if they made one; otherwise whatever the device is set to. */
-export function resolveTheme(choice: Theme | null, deviceIsDark: boolean): Theme {
-  return choice ?? (deviceIsDark ? Theme.Dark : Theme.Light);
+/** Light until the player chooses. The device's own light or dark setting is not followed. */
+export function resolveTheme(choice: Theme | null): Theme {
+  return choice ?? Theme.Light;
 }
 
 export function otherTheme(theme: Theme): Theme {
   return theme === Theme.Dark ? Theme.Light : Theme.Dark;
-}
-
-const DEVICE_DARK = '(prefers-color-scheme: dark)';
-
-export function deviceIsDark(): boolean {
-  return window.matchMedia(DEVICE_DARK).matches;
-}
-
-/** Calls back when the device switches between light and dark. Returns how to stop. */
-export function onDeviceThemeChange(listener: (dark: boolean) => void): () => void {
-  const query = window.matchMedia(DEVICE_DARK);
-  // Safari before 14 has no events here; such a browser simply does not follow the change.
-  if (typeof query.addEventListener !== 'function') return () => {};
-  const handle = (): void => listener(query.matches);
-  query.addEventListener('change', handle);
-  return () => query.removeEventListener('change', handle);
 }
 
 /** The theme on screen now. index.html has already set it by the time any of this runs. */

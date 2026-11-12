@@ -49,30 +49,32 @@ test('the theme button switches to dark and back, and the choice survives a rest
   expect(await isDark(page)).toBe(false);
 });
 
-test('until the player chooses, the game follows the device setting', async ({ page }) => {
+test('the game starts light, even on a phone set to dark', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await restart(page);
-  expect(await isDark(page)).toBe(true);
-  await expect(page.getByRole('button', { name: 'Switch to light theme' })).toBeVisible();
-
-  // The device changes while the game is open (sunset, a schedule).
-  await page.emulateMedia({ colorScheme: 'light' });
-  await expect.poll(() => isDark(page)).toBe(false);
-});
-
-test("the player's choice outlasts the device setting", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await restart(page);
-  await page.getByRole('button', { name: 'Switch to light theme' }).click();
   expect(await isDark(page)).toBe(false);
+  expect(await pageColor(page)).toBe(LIGHT_PAGE);
+  await expect(page.getByRole('button', { name: 'Switch to dark theme' })).toBeVisible();
 
-  await restart(page);
-  expect(await isDark(page)).toBe(false);
-
+  // The device changing while the game is open changes nothing either.
   await page.emulateMedia({ colorScheme: 'light' });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForTimeout(100);
   expect(await isDark(page)).toBe(false);
+});
+
+test("the player's choice is all that decides the theme", async ({ page }) => {
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click();
+  expect(await isDark(page)).toBe(true);
+
+  await page.emulateMedia({ colorScheme: 'light' });
+  await restart(page);
+  expect(await isDark(page)).toBe(true);
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.waitForTimeout(100);
+  expect(await isDark(page)).toBe(true);
 });
 
 test('a dark-theme player never sees a light page while the game loads', async ({ page }) => {

@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Theme,
   applyTheme,
-  deviceIsDark,
-  onDeviceThemeChange,
   otherTheme,
   parseTheme,
   resolveTheme,
@@ -18,9 +16,8 @@ interface ThemeControls {
 }
 
 /**
- * The theme on screen and the switch that changes it. Until the player uses the
- * switch the game follows the device, including when the device changes while
- * the game is open; after that the choice is theirs and is remembered.
+ * The theme on screen and the switch that changes it. The game is light until
+ * the player switches; the choice is then remembered.
  */
 export function useTheme(): ThemeControls {
   const [theme, setTheme] = useState<Theme>(shownTheme);
@@ -36,23 +33,14 @@ export function useTheme(): ThemeControls {
   useEffect(() => {
     let cancelled = false;
     void getThemeChoice().then(raw => {
+      // A switch made while the saved choice was still loading wins.
       if (cancelled || chosenRef.current) return;
-      const choice = parseTheme(raw);
-      chosenRef.current = choice !== null;
-      show(resolveTheme(choice, deviceIsDark()));
+      show(resolveTheme(parseTheme(raw)));
     });
     return () => {
       cancelled = true;
     };
   }, [show]);
-
-  useEffect(
-    () =>
-      onDeviceThemeChange(dark => {
-        if (!chosenRef.current) show(dark ? Theme.Dark : Theme.Light);
-      }),
-    [show],
-  );
 
   const toggleTheme = useCallback(() => {
     const next = otherTheme(themeRef.current);

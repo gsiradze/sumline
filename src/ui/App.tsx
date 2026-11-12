@@ -13,7 +13,10 @@ import {
   getMusicEnabled,
   getMuted,
   getNotificationsEnabled,
+  getRulesShown,
+  loadProgress,
   purgeLegacyKeys,
+  setRulesShown,
   setHapticsEnabled as persistHaptics,
   setMusicEnabled as persistMusic,
   setMuted as persistMuted,
@@ -23,11 +26,12 @@ import { scheduleReminders } from '../platform/notifications';
 import { music } from '../game/audio/music';
 import { sound } from '../game/audio/soundManager';
 import { setHapticsEnabled } from '../game/audio/haptics';
-import { adResult, settingChanged } from '../telemetry/events';
+import { adResult, settingChanged, tutorialComplete } from '../telemetry/events';
 import { adProvider } from '../storage/ads';
 import { canShowInterstitial, noteAdShown, noteLevelComplete } from '../storage/adSession';
 import { bakedLevel } from '../storage/levelsManifest';
 import { isLevelAccessible, tierForLevelId } from '../game/domain/levels';
+import { TUTORIAL_LEVEL_ID } from '../game/domain/tutorial';
 import type { Tier } from '../game/domain/types';
 import { Theme } from '../platform/theme';
 import { useProgress } from './hooks/useProgress';
@@ -42,7 +46,12 @@ const BANNER_GAP_PX = 16;
 type View =
   | { readonly kind: 'home' }
   | { readonly kind: 'tier'; readonly tier: Tier }
-  | { readonly kind: 'level'; readonly levelId: number };
+  | {
+      readonly kind: 'level';
+      readonly levelId: number;
+      /** Where a new player was headed when the tutorial took them to level 1 first. */
+      readonly then?: number;
+    };
 
 const SPLASH_KEY = 'sumline.splash.shown';
 
@@ -55,6 +64,16 @@ function shouldShowSplash(): boolean {
   } catch {
     return true;
   }
+}
+
+/** Whether this player has had the tutorial, or has plainly learned the game without it. */
+async function readTutorialDone(): Promise<boolean> {
+  if (await getRulesShown()) return true;
+  const progress = await loadProgress();
+  if (!Object.values(progress).some(record => record.completed)) return false;
+  // Levels solved before this tutorial existed: there is nothing left to teach.
+  void setRulesShown(true);
+  return true;
 }
 
 function viewKey(view: View): string {
@@ -91,6 +110,15 @@ function Game() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [getAppOpen, setGetAppOpen] = useState(false);
   const [splashing, setSplashing] = useState(shouldShowSplash);
+  // Counts replays of the tutorial, so level 1 starts afresh for each one.
+  const [tourRuns, setTourRuns] = useState(0);
+  // Whether this player has been through the tutorial (or skipped it). Null
+  // for the first moments, while that is being read.
+  const [tutorialDone, setTutorialDone] = useState<boolean | null>(null);
+  const tutorialDoneRef = useRef(tutorialDone);
+  tutorialDoneRef.current = tutorialDone;
+  const viewRef = useRef(view);
+  viewRef.current = view;
   const { progress, recordLevelWin } = useProgress();
   const { stats, hydrated: statsHydrated, onWin: onStatsWin, onLoss: onStatsLoss } = useStats();
   const { theme, toggleTheme } = useTheme();
@@ -109,6 +137,17 @@ function Game() {
 
   useEffect(() => {
     void purgeLegacyKeys();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void readTutorialDone().then(done => {
+      // Not if the answer has changed meanwhile (the tutorial ended, or was asked for again).
+      if (!cancelled && tutorialDoneRef.current === null) setTutorialDone(done);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -201,15 +240,32 @@ function Game() {
     setView({ kind: 'tier', tier });
   }, []);
 
-  /** Opens a level unless the web demo ends before it. Returns whether it opened. */
-  const openLevel = useCallback((levelId: number): boolean => {
+  /**
+   * Opens a level unless the web demo ends before it. A new player is taken
+   * through the tutorial on level 1 first, whichever level they asked for and
+   * however they asked (the level list, a shared link): there is one tutorial.
+   */
+  const openLevel = useCallback((levelId: number): void => {
     const limit = demoLevelLimit();
     if (limit !== null && levelId >= limit) {
       setGetAppOpen(true);
-      return false;
+      return;
     }
-    setView({ kind: 'level', levelId });
-    return true;
+    if (tutorialDoneRef.current === null) {
+      void readTutorialDone().then(done => {
+        if (tutorialDoneRef.current === null) {
+          tutorialDoneRef.current = done;
+          setTutorialDone(done);
+        }
+        openLevel(levelId);
+      });
+      return;
+    }
+    if (tutorialDoneRef.current || levelId === TUTORIAL_LEVEL_ID) {
+      setView({ kind: 'level', levelId });
+    } else {
+      setView({ kind: 'level', levelId: TUTORIAL_LEVEL_ID, then: levelId });
+    }
   }, []);
 
   const handlePickLevel = useCallback(
@@ -237,7 +293,11 @@ function Game() {
         setGetAppOpen(true);
         return false;
       }
-      if (!isLevelAccessible(progressRef.current, nextLevelId)) {
+      // The level a new player was headed for when the tutorial came first was
+      // already theirs to open (a shared link opens any level).
+      const current = viewRef.current;
+      const resuming = current.kind === 'level' && current.then === nextLevelId;
+      if (!resuming && !isLevelAccessible(progressRef.current, nextLevelId)) {
         setView({ kind: 'tier', tier: tierForLevelId(Math.max(0, nextLevelId - 1)) });
         return true;
       }
@@ -257,10 +317,37 @@ function Game() {
     setView({ kind: 'home' });
   }, []);
 
+  const handleTutorialEnd = useCallback((skipped: boolean) => {
+    tutorialDoneRef.current = true;
+    setTutorialDone(true);
+    void setRulesShown(true);
+    tutorialComplete(skipped);
+    // The banner stays off until a new player has finished the tutorial.
+    void adProvider.showBanner();
+    // Skipped on the way to another level: that level is where they wanted to be.
+    // (After a win the level's own "Next" leads there.)
+    if (!skipped) return;
+    setView(v =>
+      v.kind === 'level' && v.then !== undefined ? { kind: 'level', levelId: v.then } : v,
+    );
+  }, []);
+
+  // Level 1 runs the tour for anyone who has not been through it, so forgetting
+  // that they have is all a replay takes.
+  const handleReplayTutorial = useCallback(() => {
+    tutorialDoneRef.current = false;
+    setTutorialDone(false);
+    void setRulesShown(false);
+    setSettingsOpen(false);
+    setTourRuns(n => n + 1);
+    setView({ kind: 'level', levelId: TUTORIAL_LEVEL_ID });
+  }, []);
+
   const handleBackToTier = useCallback(() => {
     setView(v => {
       if (v.kind === 'level') {
-        return { kind: 'tier', tier: tierForLevelId(v.levelId) };
+        // From the tutorial, back to the list of the level that was picked.
+        return { kind: 'tier', tier: tierForLevelId(v.then ?? v.levelId) };
       }
       return { kind: 'home' };
     });
@@ -298,7 +385,7 @@ function Game() {
   } else {
     screen = (
       <LevelGameView
-        key={view.levelId}
+        key={`${view.levelId}:${tourRuns}`}
         level={bakedLevel(view.levelId)}
         progress={progress}
         onRecordWin={recordLevelWin}
@@ -307,6 +394,10 @@ function Game() {
         onBack={handleBackToTier}
         onGotoLevel={handleAdvanceLevel}
         onOpenSettings={handleOpenSettings}
+        runTutorial={view.levelId === TUTORIAL_LEVEL_ID && tutorialDone === false}
+        onTutorialEnd={handleTutorialEnd}
+        onReplayTutorial={handleReplayTutorial}
+        resumeLevelId={view.then ?? null}
       />
     );
   }
@@ -328,6 +419,7 @@ function Game() {
           darkTheme={theme === Theme.Dark}
           onToggleTheme={toggleTheme}
           stats={stats}
+          onReplayTutorial={handleReplayTutorial}
           onDismiss={() => setSettingsOpen(false)}
         />
       )}
