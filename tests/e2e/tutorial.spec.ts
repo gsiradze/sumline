@@ -174,6 +174,29 @@ test('ruling out pencils the dashes the player could have drawn', async ({ page 
   }
 });
 
+test('the dashes can be drawn by hand too, one cell at a time', async ({ page }) => {
+  await openLevel(page, 0);
+  await captionButton(page, 'Next').click();
+  await touch(page, [30, 31, 32, 35]);
+  await expect(caption(page)).toContainText('This column has its 1 beaver.');
+
+  await touch(page, [0, 12]);
+  const s = await getState(page);
+  expect([0, 6, 12, 24].map(i => s.emptyNotes[i])).toEqual([true, false, true, false]);
+  expect(await marksOf(page, [0, 12])).toEqual([0, 0]);
+
+  // The button finishes what is left; or the player does.
+  await touch(page, [6, 24]);
+  await expect(caption(page)).toContainText('3 beavers, 3 free cells.');
+  await touch(page, [13, 14, 17]);
+  await expect(caption(page)).toContainText('This column has its 3 beavers.');
+  await touch(page, [1]);
+  await captionButton(page, 'Rule them out').click();
+  await expect(caption(page)).toContainText('2 beavers, 2 free cells.');
+  const after = await getState(page);
+  expect([1, 7, 25].map(i => after.emptyNotes[i])).toEqual([true, true, true]);
+});
+
 test('the tour can be skipped, and stays skipped', async ({ page }) => {
   await openLevel(page, 0);
   await expect(caption(page)).toBeVisible();

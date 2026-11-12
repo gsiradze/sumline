@@ -33,14 +33,18 @@ export function SubmitButton({ state, onSubmit, disabled }: SubmitButtonProps) {
   const short = cap - marked;
   const next = used + 1;
 
+  // Marks of the player's own: a guess without any spends a turn and shows nothing.
+  const own = state.currentMarks.some((mark, i) => mark === 1 && !state.lockedFilled[i]);
+
   let label = next === 1 ? 'Submit guess' : `Guess ${next} of ${state.guessBudget}`;
   if (over > 0) label = `Remove ${over} ${over === 1 ? 'mark' : 'marks'} to submit`;
   else if (confirming) label = `Only ${marked} of ${cap} marked · submit anyway?`;
+  else if (short > 0 && own) label = `Submit ${marked} of ${cap}`;
 
   const handleClick = (): void => {
     if (over > 0) return;
-    // A guess with unused marks can never win and always tells you less.
-    if (short > 0 && !confirming) {
+    // A short guess cannot win, but it is the player's to make: only an empty one asks first.
+    if (!own && short > 0 && !confirming) {
       setConfirming(true);
       return;
     }

@@ -144,7 +144,12 @@ export function useTutorial({ state, start, onRestart, onNote, onEnd }: UseTutor
 
   const only = useMemo((): ReadonlySet<number> | null => {
     if (!active) return null;
-    if (!step || settled || step.action !== TourAction.Mark) return NO_CELLS;
+    if (!step || settled) return NO_CELLS;
+    // The dashes the button would draw can be drawn by hand as well.
+    if (step.kind === TourStepKind.RuleOut) {
+      return new Set(step.notes.filter(i => !state.emptyNotes[i] && !state.lockedEmpty[i]));
+    }
+    if (step.action !== TourAction.Mark) return NO_CELLS;
     // What is still to mark, and what has been: a mark can always be taken back.
     const marked = step.cells.filter(i => state.currentMarks[i] === 1);
     return new Set([...tourTargets(step, state), ...marked]);

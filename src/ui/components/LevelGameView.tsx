@@ -36,7 +36,7 @@ import { GRID_SIZE, GameOutcome } from '../../game/domain/types';
 import { guessesRemaining, markedCount } from '../../game/domain/game-state';
 import { LineAxis, findHintLine } from '../../game/domain/hint';
 import { starsForWin } from '../../game/domain/stars';
-import { TUTORIAL_LEVEL_ID, tourTargets } from '../../game/domain/tutorial';
+import { TUTORIAL_LEVEL_ID, TourStepKind, tourTargets } from '../../game/domain/tutorial';
 import type { Stars } from '../../game/domain/stars';
 import { coordsForLevelId, isLevelAccessible, progressForLevel } from '../../game/domain/levels';
 import type { LevelProgressMap } from '../../game/domain/levels';
@@ -358,7 +358,7 @@ export function LevelGameView({
         <div className="board-box" style={boardSizeVars(Boolean(tip))}>
           <Board
             state={game.state}
-            tool={markMode}
+            tool={tourStep?.kind === TourStepKind.RuleOut ? 'note' : markMode}
             onMark={game.onCellTapped}
             onNote={game.onCellNoted}
             inputDisabled={inputBlocked}

@@ -316,9 +316,9 @@ test.describe('in the middle of the tour', () => {
     await expect(caption(page)).toContainText('This column has its 1 beaver.');
     await expect(caption(page)).toHaveAttribute('data-nudges', '0');
 
-    // An open cell inside the lit column: the step wants its button, not a mark.
+    // The beaver inside the lit column: the step is about the cells around it.
     const before = await getState(page);
-    await touch(page, [0]);
+    await touch(page, [30]);
     await expect(caption(page)).toHaveAttribute('data-nudges', '1');
     const after = await getState(page);
     expect(after.currentMarks).toEqual(before.currentMarks);
