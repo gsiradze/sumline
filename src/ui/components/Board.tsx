@@ -36,7 +36,8 @@ interface BoardProps {
   readonly spotlight?: BoardSpotlight | null;
   /**
    * While the tutorial is guiding: the only cells that take a touch. A touch on
-   * them only ever marks (holding does not pencil), so a step cannot go astray.
+   * them only ever uses the tool given (holding does not pencil), so a step
+   * cannot go astray.
    */
   readonly only?: ReadonlySet<number> | null;
   /** Called for a touch the board turned away while guiding, so it can be answered. */
