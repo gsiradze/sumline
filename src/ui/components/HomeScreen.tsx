@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   coordsForLevelId,
+  firstIncompleteLevelId,
   maxStarsForTier,
   progressForLevel,
   tierForLevelId,
@@ -23,13 +24,6 @@ interface HomeScreenProps {
   readonly onPickLevel: (levelId: number) => void;
   readonly onOpenStats: () => void;
   readonly onOpenSettings: () => void;
-}
-
-function firstIncompleteLevelId(progress: LevelProgressMap): number {
-  for (let id = 0; id < TOTAL_LEVELS; id++) {
-    if (!progressForLevel(progress, id).completed) return id;
-  }
-  return TOTAL_LEVELS - 1;
 }
 
 export function HomeScreen({

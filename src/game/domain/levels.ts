@@ -143,6 +143,14 @@ export function isLevelAccessible(progress: LevelProgressMap, id: number): boole
   return isBatchUnlocked(progress, tier, batchIndexInTier);
 }
 
+/** Where a player goes on: the lowest level not solved yet, or the last one when all are. */
+export function firstIncompleteLevelId(progress: LevelProgressMap): number {
+  for (let id = 0; id < TOTAL_LEVELS; id++) {
+    if (!progressForLevel(progress, id).completed) return id;
+  }
+  return TOTAL_LEVELS - 1;
+}
+
 export function batchCompletionCount(
   progress: LevelProgressMap,
   tier: Tier,

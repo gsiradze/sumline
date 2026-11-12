@@ -29,7 +29,7 @@ Every puzzle is ambiguous from its row/column totals alone by design, so guess f
 - Rewarded ads grant hints (one reveals a whole row or column) and extra retries; an interstitial may show when the player taps "Next" after a win; a bottom banner shows once the tutorial is done.
 - Every build shows Google's test ads unless it is made with `npm run cap:sync:release`.
 - Firebase Analytics + Crashlytics for telemetry. General 13+ audience, not child-directed.
-- The web build is a demo of the first 14 levels with a pointer to the store.
+- The web build is a demo of the first 14 levels with a pointer to the store. The dev server has no such limit; add `?demo` to its address to see the demo there.
 - A shared result links to its level: `https://your-site/?level=37` opens level 37 in the web version. Set `VITE_WEB_URL` in `.env` to turn that on; without it the link goes to the store listing.
 
 ## Development

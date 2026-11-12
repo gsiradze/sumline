@@ -3,6 +3,7 @@ import {
   batchCompletionCount,
   coordsForLevelId,
   emptyProgress,
+  firstIncompleteLevelId,
   isBatchComplete,
   isBatchUnlocked,
   isLevelAccessible,
@@ -116,6 +117,28 @@ describe('progress + unlock logic', () => {
     const p = completeLevels([0, 2, 5]);
     expect(batchCompletionCount(p, Tier.Beginner, 0)).toBe(3);
     expect(batchCompletionCount(p, Tier.Beginner, 1)).toBe(0);
+  });
+});
+
+describe('firstIncompleteLevelId', () => {
+  it('is the first level for a new player', () => {
+    expect(firstIncompleteLevelId(emptyProgress())).toBe(0);
+  });
+
+  it('is the lowest unsolved level, whatever was solved after it', () => {
+    expect(firstIncompleteLevelId(completeLevels([0, 1, 2]))).toBe(3);
+    expect(firstIncompleteLevelId(completeLevels([0, 1, 2, 4, 5, 13, 40]))).toBe(3);
+  });
+
+  it('is not held back by levels in a set that is still locked', () => {
+    // Its use is "where to go on", and that may be a set the player cannot open yet.
+    const everySetOne = completeLevels([0, 1, 2, 3, 4, 5, 6]);
+    expect(firstIncompleteLevelId(everySetOne)).toBe(7);
+  });
+
+  it('stays on the last level once every level is solved', () => {
+    const all = completeLevels(Array.from({ length: TOTAL_LEVELS }, (_, id) => id));
+    expect(firstIncompleteLevelId(all)).toBe(TOTAL_LEVELS - 1);
   });
 });
 
