@@ -51,6 +51,7 @@ export function SubmitButton({ state, onSubmit, disabled }: SubmitButtonProps) {
   return (
     <button
       type="button"
+      data-tour="submit"
       onClick={handleClick}
       disabled={disabled || over > 0}
       className={`w-full h-[54px] rounded-[14px] text-paper-50 font-sans text-[16px] font-semibold tracking-[0.01em] shadow-sh-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fill-800/60 ${

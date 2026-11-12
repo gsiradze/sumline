@@ -51,7 +51,7 @@ src/
       game-state.ts          # ActiveGameState reducer (mark, note, submit, hint, pre-solved init)
       stroke.ts              # What a tap or drag does to each cell it crosses
       startingBoard.ts       # The board a level starts with (tutorial row / tier pre-solved cells)
-      tutorial.ts            # The guided first solve on level 1: what the coach says and points at
+      tutorial.ts            # The guided first solve on level 1: works out each step from the board
       attempt.ts             # Save/restore of an attempt as its move list, replayed through the rules
       propagator.ts          # "Line complete → rest are empty" auto-locking
       adPolicy.ts            # Interstitial cadence (pure)
@@ -71,7 +71,7 @@ src/
     back.ts                  # Back-handler stack: overlays first, then screens, then leave the app
     consent.ts               # UMP consent; nothing ad-related runs until it allows ad requests
     deepLink.ts              # `?level=37` links: parse on arrival, build for sharing
-    theme.ts                 # Light or dark: the player's choice, else the device's setting
+    theme.ts                 # Light or dark: light until the player chooses
     share.ts, review.ts, notifications.ts, keepAwake.ts
   storage/
     persistence.ts           # Capacitor Preferences (native) / localStorage (web): progress,
@@ -86,11 +86,11 @@ src/
     components/              # Board (the SVG board and all its touch input), boardLayout,
                              # BeaverOverlay, HomeScreen, TierView, LevelCard, LevelGameView,
                              # MarkModeToggle, SubmitButton, HintButton, LastGuessSummary,
-                             # RetryGate, WinScreen, TeachingHint, TutorialCoach, RulesModal,
+                             # RetryGate, WinScreen, TeachingHint, TutorialTour, RulesModal,
                              # StatsModal, SettingsModal, GetAppModal, Splash, Wordmark,
                              # ErrorBoundary, icons
     hooks/                   # useGameState, useStats, useProgress, useRetry, useAudioFx,
-                             # useBackHandler, useKeepAwake, useTheme
+                             # useBackHandler, useKeepAwake, useTheme, useTutorial
   dev/
     CaptureStage.tsx         # Recording stage for short-form video. Dev builds only.
   styles/
@@ -126,7 +126,7 @@ The rules as shipped (older notes described a different feedback model; these ar
 - Notes: the player can pencil a "ruled out" dash on any open cell (Rule out mode, or hold a cell; holding and then dragging pencils several). Notes are never judged and are cleared when the cell locks.
 - A loss does **not** reveal the answer: the retry is the same puzzle. An attempt (in progress or lost) is saved as its move list and replayed on return, so leaving a level is not a free restart.
 
-**Every puzzle is ambiguous from its sums alone.** Levels 1–63 have 2–15 grids consistent with their clues; levels 64–210 have roughly 24,000–190,000 (the intended solution-count bands for the top three tiers were not reachable with their sum filter, so the bake fell back to unfiltered grids). Consequences worth knowing before changing balance: Advanced, Expert and Master are the same puzzle distribution and differ only by guess budget; and in those tiers even a perfect solver needs more than two guesses on about half the levels, so 3★ there is partly luck. `npm run check:levels -- --deep` prints the numbers.
+**Every puzzle is ambiguous from its sums alone.** Levels 1–63 have 4–15 grids consistent with their clues, with one exception: level 7, the last of the teaching set, has 70,287 (3,386 with its solved row), because its numbers have no extremes. Levels 64–210 have roughly 24,000–190,000 (the intended solution-count bands for the top three tiers were not reachable with their sum filter, so the bake fell back to unfiltered grids). Consequences worth knowing before changing balance: Advanced, Expert and Master are the same puzzle distribution and differ only by guess budget; and in those tiers even a perfect solver needs more than two guesses on about half the levels, so 3★ there is partly luck. `npm run check:levels -- --deep` prints the numbers.
 
 **Do not soften the top tiers with pre-solved cells.** A taper of extra pre-solved cells (12 at level 64 down to none at level 204) was built and removed on 2026-11-11. The owner's rule: a higher tier never starts with more help than a lower one (Beginner 2 cells, Intermediate 1, the rest none), and Expert is not to be made easier. Ask before proposing anything that changes how hard a tier is.
 
@@ -142,7 +142,7 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 
 - **5 tiers**: Beginner, Intermediate, Advanced, Expert, Master.
 - **Uneven batches**: 4 / 5 / 6 / 7 / 8 batches of 7 levels each → 210 total levels.
-- **Teaching**: Beginner Batch 1 (levels 0–6) starts with one whole row pre-solved and shows a one-line tip per level (`TEACHING_TIPS` in `LevelGameView.tsx`). For a new player, level 1 is a guided first solve instead of pages of rules (`tutorial.ts`, `TutorialCoach.tsx`): read the clues, see the solved row, fill the one certain line, place the rest, read the result. The coach only points and explains: it never disables the board or a button (an earlier version did, and on an iPad it read as the game being broken), and it moves on by itself when the player starts marking. It can be skipped, and runs once. A new player who opens some other level first gets the short rules pages instead. The per-level `teachingHint` strings baked into `levels.json` predate the current rules and are not shown.
+- **Teaching**: Beginner Batch 1 (levels 0–6) starts with one whole row pre-solved and shows a one-line tip per level (`TEACHING_TIPS` in `LevelGameView.tsx`). A new player is taught by the tour on level 1: see "Tutorial" below. The per-level `teachingHint` strings baked into `levels.json` predate the current rules and are not shown.
 - **Procedural**: Remaining 203 levels are generated to match a target difficulty score inside the tier's band, with progressive widening of tolerance.
 - **Scaffolding** (3★ = solved in at most 2 guesses):
   - Beginner: 5-guess budget, 2 pre-locked cells, 3★ ≤2, 2★ ≤3.
@@ -156,6 +156,21 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 - **Hints**: 1 rewarded ad = 1 hint. A hint reveals a whole row or column: the one whose open cells could still be arranged in the most ways (`findHintLine`). The line is chosen when the ad pays out, from the board as it is then.
 - **Sharing**: the win screen shares the emoji result plus a link. Where the platform's share sheet takes files (mobile browsers), a 1080×1350 image of the unsolved puzzle with the result goes with it (`shareCard.ts`). In the Android app it is text and link only: handing an image to the native share sheet needs `@capacitor/filesystem`, which is not installed. The link is `VITE_WEB_URL/?level=N` when that is set, the store listing otherwise; the web version opens `?level=N` directly on that level.
 - **Ads**: banner app-wide (never before a new player has finished the tutorial), interstitial only on an explicit "Next" tap per `adPolicy.ts`, rewarded for hints and retries. The layout reserves banner height + safe area + a gap (`--bottom-reserve` in `globals.css`); no control may sit inside it.
+
+## Tutorial
+
+Built on 2026-11-12, after the owner watched people aged 7 to 30 fail to work out the game from an earlier tutorial that explained it in a text box above the board. Their brief, in their words: "make all other columns dark and only show what you're talking about", "this text should not be in the top of the game, put it over the boxes", "make it more interactive".
+
+- **What it is.** A guided first solve of level 1 (`tutorial.ts` plans it, `useTutorial.ts` runs it, `TutorialTour.tsx` draws it). Each step lights one thing, says one thing next to it, and waits for one action: read what a number means, fill a row that needs all its free cells, rule out a full column, guess where the numbers cannot decide, check, and read the ✕. It ends in a win within two guesses whichever way the guess goes, so always three stars.
+- **Planned from the board, not scripted.** `nextTourStep(state)` reasons the way a player is meant to (a line that needs as many as it has free cells is certain; a full line rules out the rest; otherwise guess). A unit test walks level 1 through every possible guess. Change level 1's starting board and the tour follows; it does not have to be re-authored.
+- **One tutorial, every way in.** `App.tsx` owns "has this player had it" (`grid:v2:rulesShown`, or any solved level). A new player who opens any level, from the list or from a shared link, is taken to level 1 first; "Next" after the win, or Skip, then goes to the level they asked for. The old three pages of rules are deleted. Do not add a second way to teach the game.
+- **Dark veil, lit cut-outs.** Everything but what the step is about is under a veil. The veil is one element with holes cut by `clip-path`; the holes let touches through, the rest takes them. Lit lines are either rows or a single column, so two holes never overlap (overlapping holes would fill in).
+- **Never dead.** An earlier version blocked touches with nothing on screen to show it, and on an iPad it read as the game being broken. Now a touch the tour does not take is always answered: the caption jolts (`nudge`), whether it landed on the veil or on a lit cell the step does not ask for. Skip is always on screen. Keep it that way.
+- **Only the lit cells take marks** (`only` on `Board`), and a hold does not pencil while guiding, so a step cannot go astray. Ruling out is done by a button in the caption, which pencils the same dashes the player could draw.
+- **Words.** Ten at most per caption, checked by a unit test (the Plants vs. Zombies rule is eight). Captions say "beavers", which is what a found cell shows; the rest of the game still says "filled cells".
+- **Getting it back.** "Replay tutorial" in Settings and in the "?" sheet. A replay restarts level 1 clean and keeps earned stars.
+- **Measuring.** `tutorial_begin`, one `tutorial_step` per step shown (kind and position), `tutorial_complete` (skipped or not). The funnel shows where new players stop.
+- **Not on a phone yet.** The veil's cut-outs and touch pass-through are tested in Chromium and in Safari's engine, not on a device.
 
 ## Board size
 
@@ -176,7 +191,7 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 ## Themes
 
 - **Two themes, one set of names.** Every colour is a CSS variable in `globals.css`: `:root` holds the light values, `.dark` the dark ones. Components use the Tailwind names (`bg-paper-50`, `text-ink-900`) and need no theme logic. `dark` is put on `<html>` by a few lines in `index.html` before the first paint, so a dark-theme player never sees a light flash, and by `src/platform/theme.ts` after that. A unit test keeps the two in step.
-- **Which theme.** The device's setting until the player uses the switch (the sun or moon on the home screen, or "Dark theme" in Settings). After that it is their choice, saved as `grid:v2:theme`. In the app a copy is kept in localStorage, the only store `index.html` can read at once.
+- **Which theme.** Light, until the player uses the switch (the sun or moon on the home screen, or "Dark theme" in Settings). After that it is their choice, saved as `grid:v2:theme`. The device's own light or dark setting is not followed: the owner asked for light by default on 2026-11-12, after a first version that followed the device. In the app a copy of the choice is kept in localStorage, the only store `index.html` can read at once.
 - **The light theme's colours are the owner's.** On 2026-11-12 they asked for a dark theme and said, in their words, "keep white mode with this colors". Do not change a light value. The check used then: screenshot every screen before and after and compare pixel by pixel.
 - **The dark palette is held to published guidance by a test** (`src/styles/__tests__/darkPalette.test.ts`): a dark grey page, not black; cream text, not white; text at least 4.5:1 against what it sits on; raised surfaces lighter, because shadows do not show. Sources: Apple's Dark Mode guidelines, Google's Material dark theme, WCAG 2.2. The comment above `.dark` explains the scales.
 - **Not everything flips.** In dark the accent scales run the other way round (700 is the pale shade used for text, 100 the deep tint). Anything drawn as an object keeps fixed colours instead: the PLAY button, the mascot, the edge of the tier buttons (`--pin-edge`). The share image is always the light one.

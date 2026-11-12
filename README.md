@@ -22,7 +22,7 @@ Every puzzle is ambiguous from its row/column totals alone by design, so guess f
 - **210 levels** in uneven batches of 7 (4 / 5 / 6 / 7 / 8 batches per tier).
 - Batches within a tier unlock sequentially; all tiers are accessible from the start.
 - Stars (1–3) are earned by the guess count of the winning attempt.
-- Level 1 is a guided first solve for new players.
+- Level 1 is a guided first solve for new players: a spotlight tour that lights one row or column at a time. A new player who opens any other level first (from the list, or from a shared link) is taken through it, then on to the level they picked. "Replay tutorial" is in Settings.
 
 ## Monetization & platform
 

@@ -811,13 +811,13 @@ Changes made after section 10, at your request, and one that was built and then 
 |---|---|---|
 | Board without a game engine | The same board, drawn as SVG by React. Phaser is removed. Nothing runs per frame any more. | `src/ui/components/Board.tsx`, `boardLayout.ts` |
 | Drag to mark | Drag across cells to mark them; start on a marked cell to erase. Hold, then drag, to pencil several dashes. A drag never overwrites a dash with a mark or a mark with a dash. | `src/game/domain/stroke.ts` |
-| Guided tutorial | A new player's level 1 is a walked-through solve: read the clues, see the solved row, fill the one certain row, place the rest, read the result. Nothing is locked while it runs, and it follows a player who just starts marking. "Skip tutorial" is always there. It runs once. | `src/game/domain/tutorial.ts`, `TutorialCoach.tsx` |
+| Guided tutorial | Replaced on 2026-11-12 by a spotlight tour: see section 13. (The first version explained each step in a text box above the board.) | `src/game/domain/tutorial.ts`, `TutorialTour.tsx` |
 | Line hints | One ad reveals a whole row or column: the one whose open cells could be arranged in the most ways. | `src/game/domain/hint.ts` |
 | Stars in Expert and Master | A win on the last (third) guess is 2★. It was 1★. | `src/game/domain/tiers.ts` |
 | Bigger board | The grid now runs from the row numbers to the same right edge as the buttons, so cells are about 16% larger wherever the screen has room (47 → 55 px on a 440-wide phone, 38 → 44 px on a 360-wide one). On a screen too short for everything, the board narrows instead of pushing Submit off screen. | `boardLayout.ts`, `.board-box` in `globals.css` |
 | Background music | The 14.5-second loop you supplied plays on every screen from the first touch. Settings has a Music switch; Sound off silences it too. Nothing plays while the app is in the background or under a full-screen ad. | `src/game/audio/music.ts` |
 | Share image and links | Where the share sheet takes files, a picture of the unsolved puzzle with the result. The link opens that level on the web version when `VITE_WEB_URL` is set. `?level=37` opens level 37. | `src/ui/shareCard.ts`, `src/platform/deepLink.ts` |
-| Dark theme | A sun or moon button on the home screen, and "Dark theme" in Settings, switch between the light look and a dark one. The light colours are untouched. Until a player uses the switch, the game follows the phone's own light/dark setting. | `.dark` in `globals.css`, `src/platform/theme.ts`, `index.html` |
+| Dark theme | A sun or moon button on the home screen, and "Dark theme" in Settings, switch between the light look and a dark one. The light colours are untouched. The game starts light and only the switch makes it dark (it followed the phone's setting at first; changed on 2026-11-12 at your request). | `.dark` in `globals.css`, `src/platform/theme.ts`, `index.html` |
 | Settings icon, and Settings inside a level | The settings button is a gear (the old icon read as a sun, which is now the theme button). The level screen has the same gear, so sound, music, vibration and the theme can be changed without leaving a level. | `icons.tsx`, `LevelGameView.tsx` |
 | Hint notice moved | "Row 3 revealed." appears over the level title. It used to sit on the column numbers, sometimes on the very number the hint had just ringed. | `LevelGameView.tsx` |
 
@@ -839,10 +839,10 @@ For reference, should you ever want it, this is what pre-solved cells do to leve
 1. **A last-guess win in Expert and Master is 2★** (it was 1★). On these levels even perfect play needs the third guess about half the time. It does not make any level easier to win. To put it back, set `twoStarMaxGuesses` to 2 for both tiers in `tiers.ts`.
 2. **A hint reveals a whole row or column**, so it is worth much more than before, and it can put you over the mark limit by more than one because it marks every filled cell it reveals. The Submit button already says how many marks to remove.
 3. **Sliding a finger away no longer cancels a tap**: it is a drag and marks what it crosses. Only sliding straight off the board from an edge cell cancels.
-4. **The three rules pages are no longer the first thing a new player sees.** They remain behind the "?" button, and they still open first for a new player who starts on a level other than 1.
+4. **The three rules pages are gone** (section 13). The "?" button opens a one-screen summary of the rules, with "Replay tutorial" on it.
 5. **Attempts saved by earlier test builds that used a one-cell hint are dropped** when reopened (the level starts fresh). No released build ever wrote that format.
 6. **The level screen is no longer loaded lazily.** It was split off only to keep the engine out of the first load.
-7. **Until a player uses the theme switch, the game follows the phone's light/dark setting.** That is what Apple's and Google's guidance asks for, but it means a player with a dark-mode phone meets the dark look first, not the cream one in your screenshots. To always start light, make `resolveTheme` in `src/platform/theme.ts` return the light theme when there is no saved choice.
+7. **Reversed on 2026-11-12 at your request: the game always starts light.** It used to follow the phone's light/dark setting until the player used the switch. To go back, have `resolveTheme` in `src/platform/theme.ts` and the few lines in `index.html` look at `prefers-color-scheme` when there is no saved choice.
 8. **Three things look the same in both themes:** the PLAY button, the beaver, and the share image (always the light one, so shared results look alike).
 9. **On phones narrower than about 380 px the label above the level title can lose its set and level** ("INTERMEDIATE" rather than "INTERMEDIATE · 5.7"), to make room for the gear. The level number is always shown.
 10. **The recording stage uses whichever theme the game last showed** in that browser.
@@ -888,12 +888,7 @@ Both are parked: on 2026-11-11 you said to leave sharing until the app is instal
 - [ ] Switch apps mid-drag and come back: the board still responds to the next touch.
 - [ ] Clue numbers are sharp and in the serif face from the first frame, including with no network.
 
-**Tutorial**
-- [ ] Fresh install, tap PLAY: level 1 opens with the coach, not with pages of rules.
-- [ ] Nothing is ever locked: tapping a cell or Submit works from the first second, and marking a cell moves the coach on.
-- [ ] On "Your turn" the suggested row is ringed; dragging across it moves the coach on.
-- [ ] Win level 1: the coach is gone for good. Fresh install, "Skip tutorial": same.
-- [ ] On the smallest phone the coach card, the board and the Submit button can all be reached.
+**Tutorial**: see the checklist at the end of section 13.
 
 **Music** ★
 - [ ] Music starts on the first touch and loops with no click or gap (listen through at least three passes).
@@ -912,7 +907,7 @@ Both are parked: on 2026-11-11 you said to leave sharing until the app is instal
 - [ ] Drag across cells with a finger: the page does not scroll and every cell crossed is marked.
 
 **Dark theme** ★
-- [ ] Phone in dark mode, fresh install: the game opens dark. Phone in light mode: it opens light.
+- [ ] Phone in dark mode, fresh install: the game opens light. It turns dark only when you use the switch.
 - [ ] Tap the sun on the home screen: everything turns dark at once and the button shows a moon. Close and reopen the app: still dark, with no light flash after the launch screen.
 - [ ] In dark, the status bar icons (clock, battery) are light and readable; in light they are dark. Same for the navigation bar at the bottom.
 - [ ] In dark, look at the strip behind the status bar and behind the navigation bar: note any band of the wrong colour.
@@ -926,3 +921,112 @@ Both are parked: on 2026-11-11 you said to leave sharing until the app is instal
 - [ ] Share from the win screen in the app: the share sheet opens with the text and link.
 - [ ] On the web version on a phone: the share sheet offers the picture.
 
+---
+
+## 13. The tutorial, rebuilt
+
+You tested with people aged 7 to 30. None of them could work out the game from the first screen; all of them enjoyed it once you had explained it. You asked for research into what to do, and then for a tutorial that darkens everything it is not talking about, puts its words on the board instead of above it, and is more interactive. You also asked for the light theme by default.
+
+**Verified on this machine after the last change**
+
+| Check | Result |
+|---|---|
+| Typecheck, lint | Pass, 0 warnings |
+| Unit tests | 295/295 (was 286), 97% line coverage of the game logic |
+| e2e | 79/79 (was 49): the whole tour by real taps, every way into a level, every way back to the tutorial, three phone sizes |
+| The same suite in Safari's engine | 78/79; the one failure is the clipboard permission that engine's test driver lacks |
+| `npm run check:levels` | 210 levels valid, no duplicates, 8,400 random playouts consistent |
+| Production build | Pass, 1.4 MB, no source maps in it |
+| Headless browser, production build | 184/184 checks on four phone sizes, and 13/13 route checks in each of Chrome and Safari's engine; no console errors |
+| `npm run cap:sync` | Pass, no tracked file changed |
+
+**Not verified:** anything on a real phone or tablet, and nothing with a real person. The dark veil is one element with holes cut in it that must let touches through; that works in Chrome and in Safari's engine, and has never run in the Android app.
+
+### What was wrong with the old one (measured, not guessed)
+
+| What a new player met | Measured |
+|---|---|
+| Teaching by reading | 88 words in 13 px type before the first check, in a box above the board (108 in all) |
+| Everything at once | 9 controls on screen from the first second, among them Rule out and Hint |
+| Nothing answered a mark | Tapping a cell changed that cell and nothing else. The numbers never reacted |
+| The biggest thing on screen was Submit | Tapped first, it asked "Only 5 of 16 marked · submit anyway?", then spent a guess and reported "5 correct · 0 wrong" |
+| A trap | From the third step the only button in the text box was "Skip tutorial". It ended the tutorial for good, and there was no way to get it back |
+| It stopped at the hard part | One row was guided. Then: "Now the rest… Let the numbers guide you", with 7 marks still to place |
+| The game's signature was never mentioned | Level 1 cannot be finished by logic: two grids fit its numbers (9 cells certain, 7 certainly empty, 4 undecided). A perfect player gets a ✕ on the first check half the time, and nothing had said that guessing is part of the game |
+| Two tutorials | A new player whose first level was not level 1 got three pages of rules instead |
+
+### What the published research says, and what was done with it
+
+| Finding | Source | In the game |
+|---|---|---|
+| Tutorials matter most where the rules cannot be found by trying things. In the most complex of three games (45,000 players) an in-context tutorial raised play time by 29% and levels played by 75%; in the two simpler games it made no significant difference | Andersen et al., CHI 2012 | Sumline is the first kind: nothing answers a tap until a guess is spent, and guesses are scarce |
+| Teaching in context beats a manual up front (16% longer play, 40% more levels) | Andersen et al. | The tour runs on the real board, on level 1 |
+| Have the player do, not read. At most eight words on screen. One thing at a time. Let them see the result of what they did | George Fan (Plants vs. Zombies), GDC 2012 | One short caption and one action per step. Ten words at most, held by a unit test |
+| Reading a tutorial first does not help: 70 people, 4 apps, 91% succeeded after reading against 94% who skipped, and the readers rated the tasks harder (4.9 against 5.5 out of 7) | Nielsen Norman Group, mobile tutorials study | The three pages of rules are deleted |
+| An instruction read now and needed later is forgotten within about 20 seconds. Show one hint, at the moment and place it applies | Nielsen Norman Group | Each caption sits next to the row or column it is about, and goes when that step is done |
+| Teach through interactivity. Put instructions next to what they refer to. Let people skip, and make the tutorial easy to find again | Apple, Human Interface Guidelines: Onboarding | Skip is always on screen. "Replay tutorial" is in Settings and behind "?" |
+| Young children read tentatively or not at all, skip long instructions, like animation, and try everything on screen | Nielsen Norman Group, children's UX (ages 3–12) | A pointing hand, a lit target, very few words. A tap anywhere else is answered, not ignored |
+| No evidence that blocking the player improves learning | Andersen et al. | Blocking is used only to keep the steps true, it is visible (the veil), and it always answers. See choice 2 below |
+| What the eye meets first should be the heart of the game | Zach Gage, GDC 2018 | During the tour only the row or column in question is lit |
+
+### What changed
+
+| Change | What the player sees | Where |
+|---|---|---|
+| A spotlight tour | Level 1, guided from first tap to win. Everything is under a dark veil except the one row, column or button the step is about, which is lit with a gold edge. A short caption sits beside it, on the board. A hand taps where to tap | `TutorialTour.tsx`, `useTutorial.ts` |
+| The steps | 1. "Find the hidden beavers. This row has 5." 2. "4 beavers, 4 free cells. Tap them." 3. "This column has its 1 beaver. The rest are empty." with a "Rule them out" button that pencils the dashes one by one. 4–6. The same two ideas once more each. 7. "1 beaver, 2 free cells. Guess one in each row!" 8. "Tap here to check. You get 5 guesses." 9. If the guess was wrong: "✕ means no beaver. So they're here.", then "Check again." | `src/game/domain/tutorial.ts` |
+| It always ends well | Whichever way the guess goes, the tour ends in a win within two guesses, so three stars. About 15 taps | unit test over every possible guess |
+| Worked out, not scripted | Each step is worked out from the board as it stands, by the same reasoning a player is meant to use | `nextTourStep` |
+| One tutorial, every way in | PLAY, the level list, another tier, a shared link: a new player is taken through the tour on level 1 first. "Next" after the win, or Skip, then goes to the level they had picked | `App.tsx` |
+| It can be had again | "Replay tutorial" in Settings (home screen and inside any level) and on the "?" sheet. It restarts level 1 clean and keeps the stars already earned | `SettingsModal.tsx`, `RulesModal.tsx` |
+| Never dead | A tap on the dark part, or on a lit cell the step does not ask for, makes the caption jolt. Nothing is ever silently ignored | `nudge` |
+| Light by default | The game starts light on every phone. Only the sun/moon switch (or Settings) makes it dark | `src/platform/theme.ts`, `index.html` |
+
+### Choices I made that you may want to reverse
+
+1. **A new player who taps any other level is taken to level 1 first.** It is the only board the tour is built to end well on. They get to their level one tap after it, or at once with Skip.
+2. **During a step only the lit cells take marks.** The first version of the tutorial also refused taps, with nothing on screen to show it, and on an iPad that read as a broken game. This one shows what is off (the veil), answers every tap, and keeps Skip on screen. Without it a stray mark could make the next caption false.
+3. **Ruling out is a button in the caption.** The tour pencils the dashes; it does not teach "hold a cell to pencil". That is still the tip on level 4.
+4. **The guess is one cell in each of the two rows.** A second mark in the same row is refused, and a mark can be taken back.
+5. **The tour says "beavers".** It is what a found cell shows. The rest of the game still says "filled cells" (see below).
+6. **Skip sits where Back and Settings are** while the tour runs, and covers them.
+7. **The Android back button leaves the level during the tour; it does not skip.** The tour starts over the next time.
+8. **A replay restarts level 1 even if it was lost**, which is a free retry of level 1 and nothing else.
+9. **The tip line above level 1's board is hidden while the tour runs.**
+10. **One new analytics event, `tutorial_step`** (which step, and its position), next to `tutorial_begin` and `tutorial_complete`. It shows where new players stop. No personal data.
+
+### Found, not changed: your call
+
+1. **The numbers do not react to marks.** Nearly every game of this kind dims or ticks a number when its row has enough marks. It is the strongest way left to make the game explain itself, and it is what would let a player learn by poking. It also saves some counting on every level, hard ones included, which is why I did not add it unasked.
+2. **Wording outside the tour:** "filled cells", "Submit guess", "marked", "ruled out". The tour says "beavers" and "check". Making the whole game say what the tour says is a wording change in about a dozen places.
+3. **"5 of 16 marked" before the player has touched anything** (the solved row is counted as theirs), and an empty guess that costs one of five and reports "5 correct · 0 wrong".
+4. **The one-line tips above the board on levels 1 to 7** are still where the old tutorial text was. Levels 2 and 3 repeat what the tour now teaches. Levels 4 to 6 could become single lit pointers (the Rule out switch, the mark counter, the guess counter) with the same veil.
+5. **Level 7 is far outside its set.** 70,287 grids fit its numbers; every other level from 1 to 63 has 4 to 15. With its solved row, 3,386 still fit and no cell is certain. It is the seventh puzzle a new player meets, and the next set stays locked until it is won. I have not touched it: difficulty is yours to set.
+6. **On the level screen the heaviest thing is the Submit button** (a dark bar 54 px tall across the whole width). The numbers are 19 px digits, and the open cells are almost the colour of the page (1.04:1).
+
+### How to test it with people
+
+The tour shows once per device. Use Settings → Replay tutorial before each new person (or a private window).
+
+1. Hand over the phone on the home screen. Say only: "It's a puzzle game. Have a go." Then say nothing.
+2. Watch four things: what they tap first, where they stop for more than five seconds, whether they read the captions aloud or just follow the hand, and whether they press Skip.
+3. After the win ask them to explain the game back to you. If they can say what a number means and what ✕ means, it worked.
+4. Then let them play level 2 alone. That is the real test: the tour is over and nothing is lit.
+5. Five people are enough for a round (Nielsen: five find about 85% of the problems). Never the same person twice: once they know the rules they cannot un-know them.
+
+### Add to the phone checklist (section 11)
+
+**Tutorial tour** ★
+- [ ] Fresh install, tap PLAY: level 1 opens, the screen darkens except one row, and the caption sits on the board next to it.
+- [ ] Tap the dark part, and a dimmed button: nothing is marked, and the caption jolts.
+- [ ] Tap the four lit cells, and on another run drag across them: both work. Hold a lit cell: it marks, it does not pencil a dash.
+- [ ] "Rule them out": four dashes are drawn one after another, with a click each.
+- [ ] At the guess, mark one cell in each lit row, then check: the veil lifts, the beavers appear, and after a wrong guess the ✕ cells and the caption explain what is left.
+- [ ] The win is three stars after one or two checks.
+- [ ] The lit shapes line up exactly with the row, the column and the Submit button, in portrait, after rotating, and with the banner showing.
+- [ ] On the smallest phone you have: every caption is on screen and none covers what it points at. At the check step the hand under the Submit button is not cut off.
+- [ ] The Android back button during the tour: it leaves the level. PLAY again: the tour starts over on a clean board.
+- [ ] Fresh install, open the level list and tap level 3, and separately open a shared link: the tour runs first; Skip lands on the level asked for; after a win "Next" does.
+- [ ] Skip, then Settings → Replay tutorial: it is back. The same from "?" inside a level.
+- [ ] Turn on TalkBack and start the tour: note what is read out, and whether Skip can be reached.
+- [ ] With "Remove animations" on in the phone's accessibility settings: the hand still points, and every step still works.

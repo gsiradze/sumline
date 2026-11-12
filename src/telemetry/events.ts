@@ -25,6 +25,11 @@ export function tutorialComplete(skipped: boolean): void {
   trackEvent({ kind: 'tutorial_complete', skipped });
 }
 
+/** One step of the level-1 tour reached, counted from 0: shows where new players stop. */
+export function tutorialStep(step: string, index: number): void {
+  trackEvent({ kind: 'tutorial_step', step, index });
+}
+
 export function levelStart(levelId: number): void {
   trackEvent({ kind: 'level_start', level: levelId + 1 });
 }

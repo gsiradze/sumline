@@ -22,6 +22,8 @@ interface SettingsModalProps {
   readonly darkTheme: boolean;
   readonly onToggleTheme: () => void;
   readonly stats: Stats;
+  /** Closes Settings and runs the guided first solve on level 1 again. */
+  readonly onReplayTutorial: () => void;
   readonly onDismiss: () => void;
 }
 
@@ -96,6 +98,7 @@ export function SettingsModal({
   darkTheme,
   onToggleTheme,
   stats,
+  onReplayTutorial,
   onDismiss,
 }: SettingsModalProps) {
   useBackHandler(onDismiss, BACK_PRIORITY_OVERLAY);
@@ -185,6 +188,13 @@ export function SettingsModal({
           disabled={notifBusy}
           onToggle={() => void handleToggleNotifications()}
         />
+      </div>
+
+      <div className="mt-4 mx-4 rounded-[16px] border border-rule-200 bg-paper-50 overflow-hidden">
+        <button type="button" onClick={onReplayTutorial} className={linkRow}>
+          <span>Replay tutorial</span>
+          <ChevronRightIcon className="w-4 h-4 text-ink-400" />
+        </button>
       </div>
 
       {hasLinks && (

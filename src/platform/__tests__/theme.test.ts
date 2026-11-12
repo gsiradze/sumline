@@ -24,14 +24,13 @@ describe('parseTheme', () => {
 });
 
 describe('resolveTheme', () => {
-  it('follows the device while the player has not chosen', () => {
-    expect(resolveTheme(null, true)).toBe(Theme.Dark);
-    expect(resolveTheme(null, false)).toBe(Theme.Light);
+  it('is light until the player chooses', () => {
+    expect(resolveTheme(null)).toBe(Theme.Light);
   });
 
-  it("keeps the player's choice whatever the device says", () => {
-    expect(resolveTheme(Theme.Light, true)).toBe(Theme.Light);
-    expect(resolveTheme(Theme.Dark, false)).toBe(Theme.Dark);
+  it("keeps the player's choice", () => {
+    expect(resolveTheme(Theme.Light)).toBe(Theme.Light);
+    expect(resolveTheme(Theme.Dark)).toBe(Theme.Dark);
   });
 });
 
@@ -54,6 +53,11 @@ describe('the theme script in index.html', () => {
 
   it('reads the same saved choice as the app', () => {
     expect(html).toContain(`localStorage.getItem('${THEME_STORAGE_KEY}')`);
+  });
+
+  it("goes dark only on the player's choice, never because the device is dark", () => {
+    expect(html).toContain(`=== '${Theme.Dark}'`);
+    expect(html).not.toContain('prefers-color-scheme');
   });
 
   it("colours the browser's own bars with each theme's page colour", () => {

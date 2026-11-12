@@ -307,11 +307,11 @@ function copyThemeForFirstPaint(theme: string): void {
   try {
     window.localStorage.setItem(K_THEME, theme);
   } catch {
-    // swallow: the page then starts in the device's theme and corrects itself
+    // swallow: the page then starts light and corrects itself
   }
 }
 
-/** 'light' or 'dark' once the player has chosen; null while the game follows the device. */
+/** 'light' or 'dark' once the player has chosen; null until then (the game is light). */
 export async function getThemeChoice(): Promise<string | null> {
   await ensureMigrated();
   const theme = await safeGet(K_THEME);

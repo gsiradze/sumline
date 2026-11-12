@@ -98,6 +98,10 @@
     /* The page colour fading out, for content that scrolls under a fixed footer. */
     --page-veil: rgba(250, 246, 240, 0.9);
     --page-clear: rgba(250, 246, 240, 0);
+    /* What the tutorial lays over everything it is not talking about, and the
+       glow around what it is. */
+    --tour-veil: rgba(31, 27, 22, 0.78);
+    --tour-glow: rgba(195, 154, 62, 0.55);
 
     color-scheme: light;
 
@@ -171,6 +175,7 @@
     --pin-edge: #0f0d0b;
     --page-veil: rgba(28, 24, 21, 0.9);
     --page-clear: rgba(28, 24, 21, 0);
+    --tour-veil: rgba(0, 0, 0, 0.74);
 
     color-scheme: dark;
   }
@@ -249,6 +254,43 @@
     animation: boardRing 1.3s ease-in-out infinite;
   }
 
+  /* The tutorial tour (TutorialTour.tsx). */
+  .tour-veil {
+    background: var(--tour-veil);
+    animation: tourFade 220ms ease-out both;
+  }
+
+  .tour-hole {
+    box-shadow:
+      0 0 0 2px var(--ochre-500),
+      0 0 16px 3px var(--tour-glow);
+    transition: box-shadow 160ms ease-out;
+  }
+
+  .tour-hole-done {
+    box-shadow:
+      0 0 0 3px var(--sage-500),
+      0 0 16px 3px var(--tour-glow);
+  }
+
+  .tour-caption {
+    animation: tourPop 240ms cubic-bezier(0.2, 0.8, 0.3, 1.1) both;
+  }
+
+  .tour-nudge {
+    animation: tourNudge 320ms ease-out both;
+  }
+
+  /* Rests touching what it points at, so it still points with motion turned off. */
+  .tour-hand {
+    transform-origin: 40% 0%;
+    animation: tourTap 1.35s ease-in-out infinite;
+  }
+
+  .tour-ripple {
+    animation: tourRipple 1.35s ease-out infinite;
+  }
+
   .beaver-root {
     transform-box: fill-box;
     transform-origin: 50% 70%;
@@ -307,6 +349,63 @@
   }
   50% {
     opacity: 0.4;
+  }
+}
+
+@keyframes tourFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tourPop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tourNudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  60% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes tourTap {
+  0%,
+  16%,
+  100% {
+    transform: translate(0, 0) scale(0.94);
+  }
+  48%,
+  74% {
+    transform: translate(4px, 12px) scale(1);
+  }
+}
+
+@keyframes tourRipple {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.4);
+  }
+  42%,
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
   }
 }
 

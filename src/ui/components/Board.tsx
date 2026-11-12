@@ -34,6 +34,13 @@ interface BoardProps {
   /** False while a saved attempt is still loading: its history is drawn, not replayed. */
   readonly animate?: boolean;
   readonly spotlight?: BoardSpotlight | null;
+  /**
+   * While the tutorial is guiding: the only cells that take a touch. A touch on
+   * them only ever marks (holding does not pencil), so a step cannot go astray.
+   */
+  readonly only?: ReadonlySet<number> | null;
+  /** Called for a touch the board turned away while guiding, so it can be answered. */
+  readonly onRefused?: () => void;
 }
 
 type CellLook =
@@ -95,6 +102,8 @@ export function Board({
   inputDisabled = false,
   animate = true,
   spotlight = null,
+  only = null,
+  onRefused,
 }: BoardProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const strokeRef = useRef<Stroke | null>(null);
@@ -103,8 +112,8 @@ export function Board({
   const [shimmer, setShimmer] = useState(false);
 
   // Pointer handlers read the latest props through this, so they never go stale mid-stroke.
-  const live = useRef({ state, tool, onMark, onNote, inputDisabled });
-  live.current = { state, tool, onMark, onNote, inputDisabled };
+  const live = useRef({ state, tool, onMark, onNote, inputDisabled, only, onRefused });
+  live.current = { state, tool, onMark, onNote, inputDisabled, only, onRefused };
 
   const endStroke = useCallback((): void => {
     const stroke = strokeRef.current;
@@ -185,6 +194,7 @@ export function Board({
 
   const extend = (stroke: Stroke, cell: number): void => {
     if (stroke.dead || stroke.kind === null || stroke.visited.has(cell)) return;
+    if (live.current.only && !live.current.only.has(cell)) return;
     stroke.visited.add(cell);
     const next = extendStroke(stroke.predicted, cell, stroke.kind);
     if (next === stroke.predicted) return;
@@ -199,7 +209,7 @@ export function Board({
   };
 
   const handlePointerDown = (e: ReactPointerEvent<SVGSVGElement>): void => {
-    const { state: now, inputDisabled: blocked } = live.current;
+    const { state: now, inputDisabled: blocked, only: guided } = live.current;
     if (blocked) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (strokeRef.current) {
@@ -209,7 +219,10 @@ export function Board({
     }
     const point = toBoard(e);
     const cell = point ? cellAtPoint(point) : null;
-    if (!point || cell === null || !canToggle(now, cell)) return;
+    if (!point || cell === null || !canToggle(now, cell) || (guided && !guided.has(cell))) {
+      if (guided) live.current.onRefused?.();
+      return;
+    }
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -228,12 +241,14 @@ export function Board({
       holdTimer: null,
     };
     // Holding still pencils a "ruled out" note; dragging on from there pencils more.
-    stroke.holdTimer = window.setTimeout(() => {
-      stroke.holdTimer = null;
-      if (strokeRef.current !== stroke || stroke.painting) return;
-      stroke.painting = true;
-      begin(stroke, 'note');
-    }, motion.longPressMs);
+    if (!guided) {
+      stroke.holdTimer = window.setTimeout(() => {
+        stroke.holdTimer = null;
+        if (strokeRef.current !== stroke || stroke.painting) return;
+        stroke.painting = true;
+        begin(stroke, 'note');
+      }, motion.longPressMs);
+    }
     strokeRef.current = stroke;
   };
 
@@ -315,6 +330,7 @@ export function Board({
       {state.puzzle.colSums.map((sum, c) => (
         <Clue
           key={`c${c}`}
+          name={`c${c}`}
           x={GRID_ORIGIN_X + c * CELL_PITCH + layout.cellSize / 2}
           y={GRID_ORIGIN_Y - layout.clueGutter}
           value={sum}
@@ -324,6 +340,7 @@ export function Board({
       {state.puzzle.rowSums.map((sum, r) => (
         <Clue
           key={`r${r}`}
+          name={`r${r}`}
           x={GRID_ORIGIN_X - layout.clueGutter}
           y={GRID_ORIGIN_Y + r * CELL_PITCH + layout.cellSize / 2}
           value={sum}
@@ -333,7 +350,7 @@ export function Board({
       {Array.from({ length: CELL_COUNT }, (_, i) => {
         const { x, y } = cellOrigin(i);
         const look = lookFor(i);
-        const open = playable && canToggle(state, i);
+        const open = playable && canToggle(state, i) && (!only || only.has(i));
         const motionClass = shimmer
           ? 'cell-anim cell-shimmer'
           : look === 'marked-wrong'
@@ -375,11 +392,13 @@ export function Board({
 }
 
 function Clue({
+  name,
   x,
   y,
   value,
   lit,
 }: {
+  readonly name: string;
   readonly x: number;
   readonly y: number;
   readonly value: number;
@@ -397,6 +416,7 @@ function Clue({
         />
       )}
       <text
+        data-clue={name}
         x={x}
         y={y - CLUE_LIFT}
         textAnchor="middle"
