@@ -6,6 +6,8 @@ const RED_EMOJI = '🟥';
 
 export interface ShareGridOptions {
   readonly levelNumber: number;
+  /** Said in place of the level number: "Daily #12". */
+  readonly title?: string;
   readonly url?: string;
   readonly stars?: 0 | 1 | 2 | 3;
 }
@@ -14,7 +16,7 @@ export function generateShareText(state: ActiveGameState, opts: ShareGridOptions
   const count = state.guesses.length;
   const stars = opts.stars ?? 0;
   const starPart = stars > 0 ? ` · ${starRow(stars)}` : '';
-  const header = `Sumline #${opts.levelNumber}${starPart} ${shareCount(state.outcome, count, state.guessBudget)}`;
+  const header = `Sumline ${opts.title ?? `#${opts.levelNumber}`}${starPart} ${shareCount(state.outcome, count, state.guessBudget)}`;
   const blocks = state.feedbacks.map(feedbackToBlock).join('\n\n');
   const parts = [header, blocks];
   if (opts.url) parts.push(opts.url);

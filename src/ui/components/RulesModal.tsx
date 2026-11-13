@@ -46,16 +46,20 @@ export function RulesModal({ onDismiss, onReplay }: RulesModalProps) {
 
         <div className="mt-3.5 flex flex-col gap-3">
           {[
-            { n: 1, t: 'Mark filled cells.', d: 'Tap to mark. Tap again to unmark.' },
+            {
+              n: 1,
+              t: 'Find the hidden beavers.',
+              d: 'Tap a cell to mark it. Tap again to unmark.',
+            },
             {
               n: 2,
-              t: 'Use the row and column sums.',
-              d: 'Each sum is the number of filled cells in that row or column.',
+              t: 'Use the numbers.',
+              d: 'Each number says how many beavers are in its row or column.',
             },
             {
               n: 3,
               t: 'Submit to check.',
-              d: 'Correct marks lock green. Wrong marks are crossed out for good.',
+              d: 'A right mark shows its beaver. A wrong mark becomes ✕ for good.',
             },
             {
               n: 4,
@@ -78,8 +82,8 @@ export function RulesModal({ onDismiss, onReplay }: RulesModalProps) {
         <div className="mt-4 p-3.5 rounded-[12px] bg-paper-100 border border-dashed border-rule-300 flex items-center gap-3">
           <ResultExample />
           <div className="font-sans text-[12px] leading-[1.5] text-ink-500">
-            <span className="text-sage-700 font-semibold">Green</span>: correct & locked.{' '}
-            <span className="text-ink-900 font-semibold">Filled</span>: your current mark.
+            <span className="text-sage-700 font-semibold">Green</span>: a beaver, found.{' '}
+            <span className="text-ink-900 font-semibold">Dark</span>: your mark, not checked yet.
           </div>
         </div>
 

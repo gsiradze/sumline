@@ -4,9 +4,12 @@ import { emptyStats } from '../game/domain/stats';
 import type { Stats } from '../game/domain/stats';
 import { emptyProgress } from '../game/domain/levels';
 import type { LevelProgressMap, LevelProgressRecord } from '../game/domain/levels';
+import { emptyDaily } from '../game/domain/daily';
+import type { DailyRecord, DailyResult } from '../game/domain/daily';
 
 const K_STATS = 'grid:v2:stats';
 const K_PROGRESS = 'grid:v2:progress';
+const K_DAILY = 'grid:v2:daily';
 const K_RETRY = (levelId: number): string => `grid:v2:retry:${levelId}`;
 const K_RULES = 'grid:v2:rulesShown';
 const K_MUTED = 'grid:v2:muted';
@@ -118,6 +121,7 @@ export async function resetGameData(): Promise<void> {
     safeRemove(K_STATS),
     safeRemove(K_PROGRESS),
     safeRemove(K_RULES),
+    safeRemove(K_DAILY),
     resetAllWithPrefix('grid:v2:retry:'),
     resetAllWithPrefix('grid:v2:attempt:'),
   ]);
@@ -150,6 +154,42 @@ async function runMigration(): Promise<void> {
 
 function count(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function loadDaily(): Promise<DailyRecord> {
+  await ensureMigrated();
+  const raw = await safeGet(K_DAILY);
+  if (!raw) return emptyDaily();
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown> | null;
+    if (typeof parsed !== 'object' || parsed === null) return emptyDaily();
+    const results: Record<string, DailyResult> = {};
+    const stored = parsed.results;
+    if (typeof stored === 'object' && stored !== null) {
+      for (const [day, value] of Object.entries(stored as Record<string, unknown>)) {
+        if (!ISO_DAY.test(day) || typeof value !== 'object' || value === null) continue;
+        const v = value as Partial<DailyResult>;
+        const stars = v.stars;
+        if (stars !== 0 && stars !== 1 && stars !== 2 && stars !== 3) continue;
+        results[day] = { won: v.won === true, guesses: count(v.guesses), stars };
+      }
+    }
+    const last = parsed.lastWonIso;
+    return {
+      results,
+      streak: count(parsed.streak),
+      bestStreak: count(parsed.bestStreak),
+      lastWonIso: typeof last === 'string' && ISO_DAY.test(last) ? last : null,
+    };
+  } catch {
+    return emptyDaily();
+  }
+}
+
+export async function saveDaily(record: DailyRecord): Promise<void> {
+  await saveJson(K_DAILY, record);
 }
 
 export async function loadStats(): Promise<Stats> {

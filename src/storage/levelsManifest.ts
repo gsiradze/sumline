@@ -1,5 +1,7 @@
 import rawManifest from '../../public/levels.json';
-import { TOTAL_LEVELS } from '../game/domain/tiers';
+import { DAILY_TIER, dailyLevelId, dailyPuzzle } from '../game/domain/daily';
+import { scoreDifficulty } from '../game/domain/difficulty';
+import { TOTAL_LEVELS, configForTier } from '../game/domain/tiers';
 import { Tier } from '../game/domain/types';
 import type { Cell, Puzzle, Grid } from '../game/domain/types';
 
@@ -64,9 +66,7 @@ function coerceTier(value: string): Tier {
 const parsed = rawManifest as RawManifest;
 
 if (parsed.levels.length !== TOTAL_LEVELS) {
-  throw new Error(
-    `levels manifest has ${parsed.levels.length} levels, expected ${TOTAL_LEVELS}`,
-  );
+  throw new Error(`levels manifest has ${parsed.levels.length} levels, expected ${TOTAL_LEVELS}`);
 }
 
 export const LEVELS: readonly BakedLevel[] = parsed.levels.map(
@@ -83,8 +83,29 @@ export function bakedLevel(id: number): BakedLevel {
   return level;
 }
 
-export function puzzleForLevel(id: number): Puzzle {
-  const level = bakedLevel(id);
+/** The day's puzzle in the shape of a level, so the level screen can play it. */
+export function dailyLevel(iso: string): BakedLevel {
+  const puzzle = dailyPuzzle(iso);
+  const config = configForTier(DAILY_TIER);
+  return {
+    id: dailyLevelId(iso),
+    tier: DAILY_TIER,
+    batchIndexInTier: 0,
+    indexInBatch: 0,
+    technique: null,
+    teachingHint: null,
+    solution: puzzle.solution,
+    rowSums: puzzle.rowSums,
+    colSums: puzzle.colSums,
+    filledCount: puzzle.filledCount,
+    seed: puzzle.seed,
+    difficultyScore: scoreDifficulty(puzzle).total,
+    guessBudget: config.guessBudget,
+    preLockedCellCount: config.preLockedCells,
+  };
+}
+
+export function puzzleOf(level: BakedLevel): Puzzle {
   return {
     solution: level.solution,
     rowSums: level.rowSums,

@@ -29,7 +29,9 @@ import { setHapticsEnabled } from '../game/audio/haptics';
 import { adResult, settingChanged, tutorialComplete } from '../telemetry/events';
 import { adProvider } from '../storage/ads';
 import { canShowInterstitial, noteAdShown, noteLevelComplete } from '../storage/adSession';
-import { bakedLevel } from '../storage/levelsManifest';
+import { bakedLevel, dailyLevel } from '../storage/levelsManifest';
+import { dailyNumber, dailyStreak } from '../game/domain/daily';
+import { isoDateLocal } from '../game/domain/stats';
 import { isLevelAccessible, tierForLevelId } from '../game/domain/levels';
 import { TUTORIAL_LEVEL_ID } from '../game/domain/tutorial';
 import type { Tier } from '../game/domain/types';
@@ -37,6 +39,7 @@ import { Theme } from '../platform/theme';
 import { useProgress } from './hooks/useProgress';
 import { useStats } from './hooks/useStats';
 import { useTheme } from './hooks/useTheme';
+import { useDaily } from './hooks/useDaily';
 import { registerNav } from '../testHook';
 
 const MAX_BANNER_RESERVE_PX = 120;
@@ -46,6 +49,7 @@ const BANNER_GAP_PX = 16;
 type View =
   | { readonly kind: 'home' }
   | { readonly kind: 'tier'; readonly tier: Tier }
+  | { readonly kind: 'daily'; readonly iso: string }
   | {
       readonly kind: 'level';
       readonly levelId: number;
@@ -79,6 +83,7 @@ async function readTutorialDone(): Promise<boolean> {
 function viewKey(view: View): string {
   if (view.kind === 'level') return `level:${view.levelId}`;
   if (view.kind === 'tier') return `tier:${view.tier}`;
+  if (view.kind === 'daily') return `daily:${view.iso}`;
   return 'home';
 }
 
@@ -127,6 +132,14 @@ function Game() {
     reset: resetStats,
   } = useStats();
   const { theme, toggleTheme } = useTheme();
+  const { record: daily, recordResult: recordDailyResult, reset: resetDaily } = useDaily();
+  // The player's calendar day, looked at again whenever they come back to the app.
+  const [today, setToday] = useState(() => isoDateLocal());
+  useEffect(() => {
+    const refresh = (): void => setToday(isoDateLocal());
+    document.addEventListener('visibilitychange', refresh);
+    return () => document.removeEventListener('visibilitychange', refresh);
+  }, []);
   const [muted, setMutedState] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
@@ -351,9 +364,10 @@ function Game() {
     setTutorialDone(false);
     resetProgress();
     resetStats();
+    resetDaily();
     void resetGameData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetProgress]);
+  }, [resetProgress, resetDaily]);
 
   const handleBackToTier = useCallback(() => {
     setView(v => {
@@ -381,6 +395,16 @@ function Game() {
         onToggleTheme={toggleTheme}
         onPickTier={handlePickTier}
         onPickLevel={handlePickLevel}
+        daily={
+          tutorialDone
+            ? {
+                title: `Daily #${dailyNumber(today)}`,
+                result: daily.results[today] ?? null,
+                streak: dailyStreak(daily, today),
+              }
+            : null
+        }
+        onPlayDaily={() => setView({ kind: 'daily', iso: today })}
         onOpenStats={() => setStatsOpen(true)}
         onOpenSettings={handleOpenSettings}
       />
@@ -392,6 +416,29 @@ function Game() {
         progress={progress}
         onBack={handleBackToHome}
         onPickLevel={handlePickLevel}
+      />
+    );
+  } else if (view.kind === 'daily') {
+    const { iso } = view;
+    screen = (
+      <LevelGameView
+        key={`daily:${iso}`}
+        level={dailyLevel(iso)}
+        progress={progress}
+        onRecordWin={recordLevelWin}
+        onRecordStatsWin={onStatsWin}
+        onRecordStatsLoss={onStatsLoss}
+        onBack={handleBackToHome}
+        onGotoLevel={handleAdvanceLevel}
+        onOpenSettings={handleOpenSettings}
+        runTutorial={false}
+        onTutorialEnd={handleTutorialEnd}
+        onReplayTutorial={handleReplayTutorial}
+        resumeLevelId={null}
+        daily={{
+          title: `Daily #${dailyNumber(iso)}`,
+          onResult: result => recordDailyResult(iso, result),
+        }}
       />
     );
   } else {

@@ -165,7 +165,7 @@ test('capture mode (dev only) shows the board without the app chrome', async ({ 
   await expect(page.locator('[data-board]')).toBeVisible();
   await expect(page.getByText('Level 3')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to levels' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Submit guess/ })).toHaveCount(0);
+  await expect(page.locator('[data-tour="submit"]')).toHaveCount(0);
 });
 
 test('a win short of three stars can be replayed, and the better result is kept', async ({
@@ -187,9 +187,10 @@ test('a win short of three stars can be replayed, and the better result is kept'
   await expect(page.getByText('Solved in 4.')).toBeVisible();
   await expect(page.getByLabel('1 of 3 stars')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Replay' }).click();
+  // The replay costs an ad (the dev build's stand-in pays out after a moment).
+  await page.getByRole('button', { name: /^Replay/ }).click();
+  await expect.poll(async () => (await getState(page)).outcome).toBe(OUTCOME_IN_PROGRESS);
   const fresh = await getState(page);
-  expect(fresh.outcome).toBe(OUTCOME_IN_PROGRESS);
   expect(fresh.guesses).toHaveLength(0);
 
   await page.waitForTimeout(BETWEEN_GUESSES_MS);
@@ -198,7 +199,7 @@ test('a win short of three stars can be replayed, and the better result is kept'
   await expect(page.getByText('Solved in 1.')).toBeVisible();
   await expect(page.getByLabel('3 of 3 stars')).toBeVisible();
   // Nothing left to improve.
-  await expect(page.getByRole('button', { name: 'Replay' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Replay/ })).toHaveCount(0);
   await expect
     .poll(() =>
       page.evaluate(() => JSON.parse(localStorage.getItem('grid:v2:progress') ?? '{}')['1']?.stars),

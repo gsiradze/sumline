@@ -22,7 +22,7 @@ import { haptics } from '../../game/audio/haptics';
 import { startingBoard } from '../../game/domain/startingBoard';
 import { GameOutcome } from '../../game/domain/types';
 import { clearAttempt, loadAttempt, saveAttempt } from '../../storage/persistence';
-import { puzzleForLevel } from '../../storage/levelsManifest';
+import { puzzleOf } from '../../storage/levelsManifest';
 import type { BakedLevel } from '../../storage/levelsManifest';
 
 type Action =
@@ -47,7 +47,7 @@ const SUBMIT_LOCK_MS = 650;
 const SAVE_DEBOUNCE_MS = 400;
 
 export function freshGame(level: BakedLevel): ActiveGameState {
-  return startingBoard(puzzleForLevel(level.id), level);
+  return startingBoard(puzzleOf(level), level);
 }
 
 function freshAttempt(level: BakedLevel): AttemptState {

@@ -36,8 +36,8 @@ export function LastGuessSummary({ state }: LastGuessSummaryProps) {
     return (
       <div className={shell}>
         <p className="font-sans text-[13px] leading-[1.4] text-ink-700">
-          <span className="font-semibold text-ink-900">{cap} cells are filled.</span> Mark where you
-          think they are, then submit.
+          <span className="font-semibold text-ink-900">{cap} beavers are hiding.</span> Mark where
+          you think they are, then submit.
         </p>
       </div>
     );

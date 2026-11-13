@@ -33,7 +33,7 @@ async function measure(page: Page): Promise<Measured> {
     const rect = (selector: string): DOMRect =>
       document.querySelector(selector)!.getBoundingClientRect();
     const buttons = [...document.querySelectorAll('button')];
-    const submit = buttons.find(b => /Submit guess/.test(b.textContent ?? ''))!;
+    const submit = buttons.find(b => b.dataset.tour === 'submit')!;
     const hint = buttons.find(b => /Hint/.test(b.textContent ?? ''))!;
     const first = rect('[data-cell="0"] rect');
     return {
