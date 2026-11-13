@@ -112,6 +112,17 @@ export async function resetAllWithPrefix(prefix: string): Promise<void> {
   }
 }
 
+/** Erases what the player has earned or half-played. Their settings are kept. */
+export async function resetGameData(): Promise<void> {
+  await Promise.all([
+    safeRemove(K_STATS),
+    safeRemove(K_PROGRESS),
+    safeRemove(K_RULES),
+    resetAllWithPrefix('grid:v2:retry:'),
+    resetAllWithPrefix('grid:v2:attempt:'),
+  ]);
+}
+
 let migrationPromise: Promise<void> | null = null;
 
 export function ensureMigrated(): Promise<void> {

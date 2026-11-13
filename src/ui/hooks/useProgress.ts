@@ -8,6 +8,8 @@ export interface UseProgress {
   readonly progress: LevelProgressMap;
   readonly hydrated: boolean;
   readonly recordLevelWin: (levelId: number, guessCount: number, stars: Stars) => void;
+  /** Forgets everything in memory. Erasing what is saved is the caller's job. */
+  readonly reset: () => void;
 }
 
 export function useProgress(): UseProgress {
@@ -48,5 +50,7 @@ export function useProgress(): UseProgress {
     [],
   );
 
-  return { progress, hydrated, recordLevelWin };
+  const reset = useCallback(() => setProgress(emptyProgress()), []);
+
+  return { progress, hydrated, recordLevelWin, reset };
 }

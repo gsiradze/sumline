@@ -24,8 +24,13 @@ interface SettingsModalProps {
   readonly stats: Stats;
   /** Closes Settings and runs the guided first solve on level 1 again. */
   readonly onReplayTutorial: () => void;
+  /** Erases stars, stats and half-played levels, and closes Settings. */
+  readonly onResetProgress: () => void;
   readonly onDismiss: () => void;
 }
+
+// How long "Reset progress" waits for its second tap before it stands down.
+const RESET_CONFIRM_MS = 4000;
 
 function Toggle({ on }: { readonly on: boolean }) {
   return (
@@ -99,9 +104,16 @@ export function SettingsModal({
   onToggleTheme,
   stats,
   onReplayTutorial,
+  onResetProgress,
   onDismiss,
 }: SettingsModalProps) {
   useBackHandler(onDismiss, BACK_PRIORITY_OVERLAY);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  useEffect(() => {
+    if (!confirmingReset) return;
+    const t = window.setTimeout(() => setConfirmingReset(false), RESET_CONFIRM_MS);
+    return () => window.clearTimeout(t);
+  }, [confirmingReset]);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifBusy, setNotifBusy] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
@@ -190,10 +202,22 @@ export function SettingsModal({
         />
       </div>
 
-      <div className="mt-4 mx-4 rounded-[16px] border border-rule-200 bg-paper-50 overflow-hidden">
+      <div className="mt-4 mx-4 rounded-[16px] border border-rule-200 bg-paper-50 overflow-hidden divide-y divide-rule-200">
         <button type="button" onClick={onReplayTutorial} className={linkRow}>
           <span>Replay tutorial</span>
           <ChevronRightIcon className="w-4 h-4 text-ink-400" />
+        </button>
+        <button
+          type="button"
+          onClick={confirmingReset ? onResetProgress : () => setConfirmingReset(true)}
+          className={`${linkRow} ${confirmingReset ? 'text-clay-600 font-medium' : ''}`}
+        >
+          <span>
+            {confirmingReset ? 'Erase everything? Tap again to confirm' : 'Reset progress'}
+          </span>
+          {!confirmingReset && (
+            <span className="font-sans text-[12px] text-ink-500">Stars, stats, levels</span>
+          )}
         </button>
       </div>
 

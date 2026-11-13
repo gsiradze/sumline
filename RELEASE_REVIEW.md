@@ -716,7 +716,7 @@ Everything recommended in section 4 was applied as recommended, plus your two re
 1. **No free retry when an ad cannot load.** With the bypass closed, an offline player who has used the free retry is stuck on that level until an ad loads. They are told why. Say if you want an unavailable ad to grant the retry.
 2. **The banner waits only for the tutorial**, not for the whole first session.
 3. **Typeface stays as it has always rendered** (UX-03).
-4. **Web demo ends at level 14.** The store link is dead until the listing is live. A level past the demo raises the "get the app" prompt; its "Keep playing the demo" opens the next unsolved demo level, or the Beginner list once all 14 are solved (fixed 2026-11-12: it used to only close the prompt, which left a new visitor stuck in any list past the first tier).
+4. ~~Web demo ends at level 14.~~ Removed on 2026-11-13 at the owner's request ("get rid of this modal completely"): the web build is the whole game again, with no "get the app" prompt. D10 is open again: on the web, hints and extra retries are free, because its ads are stand-ins that always pay out.
 5. **Back on the home screen minimises the app** instead of killing it, as Android does by default.
 6. **Tier pins on Home moved** to even spacing.
 7. **Board height trimmed** (dead space under the grid removed) so the controls fit above the banner on more phones.
@@ -977,7 +977,7 @@ You tested with people aged 7 to 30. None of them could work out the game from t
 | The steps | 1. "Find the hidden beavers. This row has 5." 2. "4 beavers, 4 free cells. Tap them." 3. "This column has its 1 beaver. The rest are empty." with a "Rule them out" button that pencils the dashes one by one. 4–6. The same two ideas once more each. 7. "1 beaver, 2 free cells. Guess one in each row!" 8. "Tap here to check. You get 5 guesses." 9. If the guess was wrong: "✕ means no beaver. So they're here.", then "Check again." | `src/game/domain/tutorial.ts` |
 | It always ends well | Whichever way the guess goes, the tour ends in a win within two guesses, so three stars. About 15 taps | unit test over every possible guess |
 | Worked out, not scripted | Each step is worked out from the board as it stands, by the same reasoning a player is meant to use | `nextTourStep` |
-| One tutorial, every way in | PLAY, the level list, another tier, a shared link: a new player is taken through the tour on level 1 first. "Next" after the win, or Skip, then goes to the level they had picked. On the web demo a level past level 14 raises the "get the app" prompt instead, and "Keep playing the demo" there starts the tour | `App.tsx` |
+| One tutorial, every way in | PLAY, the level list, another tier, a shared link: a new player is taken through the tour on level 1 first. "Next" after the win, or Skip, then goes to the level they had picked | `App.tsx` |
 | It can be had again | "Replay tutorial" in Settings (home screen and inside any level) and on the "?" sheet. It restarts level 1 clean and keeps the stars already earned | `SettingsModal.tsx`, `RulesModal.tsx` |
 | Never dead | A tap on the dark part, or on a lit cell the step does not ask for, makes the caption jolt. Nothing is ever silently ignored | `nudge` |
 | Light by default | The game starts light on every phone. Only the sun/moon switch (or Settings) makes it dark | `src/platform/theme.ts`, `index.html` |

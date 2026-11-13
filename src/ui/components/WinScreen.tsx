@@ -19,6 +19,8 @@ interface WinScreenProps {
   /** Null when there is no next level to go to (locked set, or the last level). */
   readonly nextLevelNumber: number | null;
   readonly onNext: () => void;
+  /** Starts the level over. Offered while there are stars still to earn. */
+  readonly onReplay: () => void;
   readonly onBack: () => void;
   /** True once Next has been pressed: everything is inert until the screen changes. */
   readonly busy: boolean;
@@ -34,6 +36,7 @@ export function WinScreen({
   stars,
   nextLevelNumber,
   onNext,
+  onReplay,
   onBack,
   busy,
 }: WinScreenProps) {
@@ -92,7 +95,7 @@ export function WinScreen({
   }, [shareText, levelNumber]);
 
   const secondary =
-    'flex-1 h-11 rounded-[12px] bg-paper-50 border border-rule-200 text-ink-700 font-sans text-[14px] font-medium inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60';
+    'flex-1 h-11 rounded-[12px] bg-paper-50 border border-rule-200 text-ink-700 font-sans text-[14px] font-medium whitespace-nowrap inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60';
 
   return (
     <section
@@ -140,6 +143,11 @@ export function WinScreen({
             {nextLevelNumber !== null ? `Next · Level ${nextLevelNumber}` : 'Back to levels'}
           </button>
           <div className="mt-2.5 flex items-center gap-2.5">
+            {stars < 3 && (
+              <button type="button" onClick={onReplay} disabled={busy} className={secondary}>
+                Replay
+              </button>
+            )}
             <button type="button" onClick={handleShare} disabled={busy} className={secondary}>
               <ShareIcon className="w-4 h-4" />
               <span>{copied ? 'Copied' : 'Share result'}</span>

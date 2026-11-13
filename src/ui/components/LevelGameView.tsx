@@ -379,6 +379,7 @@ export function LevelGameView({
           stars={stars}
           nextLevelNumber={nextOpen && nextLevelId !== null ? nextLevelId + 1 : null}
           onNext={handleNext}
+          onReplay={handleRetry}
           onBack={onBack}
           busy={advancing}
         />

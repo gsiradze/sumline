@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import {
   BETWEEN_GUESSES_MS,
@@ -165,4 +166,95 @@ test('capture mode (dev only) shows the board without the app chrome', async ({ 
   await expect(page.getByText('Level 3')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to levels' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Submit guess/ })).toHaveCount(0);
+});
+
+test('a win short of three stars can be replayed, and the better result is kept', async ({
+  page,
+}) => {
+  await openLevel(page, 1);
+  const s0 = await getState(page);
+  const wrong = [...Array(36).keys()]
+    .filter(i => s0.puzzle.solution[i] === 0 && !s0.lockedEmpty[i])
+    .slice(0, 3);
+  for (const cell of wrong) {
+    const now = await getState(page);
+    if (!now.lockedEmpty[cell]) await tapCells(page, [cell]);
+    await submit(page);
+    await page.waitForTimeout(BETWEEN_GUESSES_MS);
+  }
+  await markAnswer(page);
+  await submit(page);
+  await expect(page.getByText('Solved in 4.')).toBeVisible();
+  await expect(page.getByLabel('1 of 3 stars')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Replay' }).click();
+  const fresh = await getState(page);
+  expect(fresh.outcome).toBe(OUTCOME_IN_PROGRESS);
+  expect(fresh.guesses).toHaveLength(0);
+
+  await page.waitForTimeout(BETWEEN_GUESSES_MS);
+  await markAnswer(page);
+  await submit(page);
+  await expect(page.getByText('Solved in 1.')).toBeVisible();
+  await expect(page.getByLabel('3 of 3 stars')).toBeVisible();
+  // Nothing left to improve.
+  await expect(page.getByRole('button', { name: 'Replay' })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('grid:v2:progress') ?? '{}')['1']?.stars),
+    )
+    .toBe(3);
+});
+
+test.describe('Reset progress, in Settings', () => {
+  const stored = (page: Page): Promise<string[]> =>
+    page.evaluate(() =>
+      Object.keys(localStorage)
+        .filter(k => /^grid:v2:(progress|stats|rulesShown|attempt:|retry:)/.test(k))
+        .sort(),
+    );
+
+  test('asks twice, then the game is as a new player gets it; settings are kept', async ({
+    page,
+  }) => {
+    await openLevel(page, 0);
+    await markAnswer(page);
+    await submit(page);
+    await expect(page.getByText(/^Solved in 1\./)).toBeVisible();
+    // A half-played level too, so there is a saved attempt to erase.
+    await page.evaluate(() => window.__gridTest!.backToHome());
+    await openLevel(page, 1);
+    const s = await getState(page);
+    const open = [...Array(36).keys()].find(i => !s.lockedFilled[i] && !s.lockedEmpty[i])!;
+    await tapCells(page, [open]);
+    await page.evaluate(() => localStorage.setItem('grid:v2:muted', '1'));
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Reset progress' }).click();
+    // One tap erases nothing.
+    expect(await stored(page)).toContain('grid:v2:progress');
+    await page.getByRole('button', { name: /Erase everything\?/ }).click();
+
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'PLAY' })).toBeVisible();
+    await expect(page.getByText(/LEVEL 1 ·/)).toBeVisible();
+    await page.waitForTimeout(700);
+    expect(await stored(page)).toEqual([]);
+    expect(await page.evaluate(() => localStorage.getItem('grid:v2:muted'))).toBe('1');
+
+    // And it stays that way: the tutorial is back, level 2 is untouched.
+    await page.reload();
+    await page.waitForFunction(() => typeof window.__gridTest !== 'undefined');
+    await page.getByRole('button', { name: 'PLAY' }).click();
+    await expect(page.locator('[data-tour-caption]')).toContainText('Find the hidden beavers');
+  });
+
+  test('the question goes away if it is not answered', async ({ page }) => {
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Reset progress' }).click();
+    await expect(page.getByRole('button', { name: /Erase everything\?/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reset progress' })).toBeVisible({
+      timeout: 6000,
+    });
+  });
 });
