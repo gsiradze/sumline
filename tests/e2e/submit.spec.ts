@@ -208,3 +208,22 @@ test('a guess with no marks of the player’s own cannot be made', async ({ page
   await page.evaluate((idx: number) => window.__gridTest!.tapCell(idx), open[0]!);
   await expect(page.getByRole('button', { name: /^Submit \d+ of \d+$/ })).toBeEnabled();
 });
+
+test('a board that hints have filled in completely can be submitted', async ({ page }) => {
+  await openLevel(page, 15);
+  const hint = page.getByRole('button', { name: /^Get a hint/ });
+  for (let i = 0; i < 6; i++) {
+    const s = await getState(page);
+    if (s.lockedFilled.filter(Boolean).length === s.puzzle.filledCount) break;
+    await hint.click();
+    await expect(hint)
+      .toBeEnabled({ timeout: 5000 })
+      .catch(() => {});
+    await page.waitForTimeout(300);
+  }
+  const s = await getState(page);
+  expect(s.lockedFilled.filter(Boolean).length).toBe(s.puzzle.filledCount);
+
+  await page.getByRole('button', { name: 'Submit guess' }).click();
+  await expect(page.getByText(/^Solved in 1\./)).toBeVisible();
+});
