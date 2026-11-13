@@ -62,7 +62,7 @@ test('level 1 walks a new player through a first solve, to three stars', async (
   await waitForHook(page);
   await openLevel(page, 0);
   await expect(veil(page)).toHaveCount(0);
-  await expect(page.getByText('One row is done for you.')).toBeVisible();
+  await expect(page.getByText('beavers are hiding.')).toBeVisible();
 });
 
 test('the right guess wins at the first check', async ({ page }) => {
@@ -85,7 +85,7 @@ test('everything but what the tour is talking about is dark, and takes no marks'
   // Lit: the row in question. Dark: an open cell elsewhere, and the buttons.
   const lit = await centreOf(page, 30);
   const dark = await centreOf(page, 0);
-  const submit = await boxOf(page.getByRole('button', { name: 'Submit guess' }));
+  const submit = await boxOf(page.locator('[data-tour="submit"]'));
   expect(await topmostAt(page, lit.x, lit.y)).toBe('game');
   expect(await topmostAt(page, dark.x, dark.y)).toBe('veil');
   expect(await topmostAt(page, submit.x + submit.width / 2, submit.y + submit.height / 2)).toBe(
@@ -202,7 +202,7 @@ test('the tour can be skipped, and stays skipped', async ({ page }) => {
   await expect(caption(page)).toBeVisible();
   await page.getByRole('button', { name: 'Skip tutorial' }).click();
   await expect(veil(page)).toHaveCount(0);
-  await expect(page.getByText('One row is done for you.')).toBeVisible();
+  await expect(page.getByText('beavers are hiding.')).toBeVisible();
 
   // The whole board is immediately playable.
   const s = await getState(page);

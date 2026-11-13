@@ -52,6 +52,7 @@ src/
       stroke.ts              # What a tap or drag does to each cell it crosses
       startingBoard.ts       # The board a level starts with (tutorial row / tier pre-solved cells)
       tutorial.ts            # The guided first solve on level 1: works out each step from the board
+      daily.ts               # The day's puzzle (made from the date), its results and streak
       attempt.ts             # Save/restore of an attempt as its move list, replayed through the rules
       propagator.ts          # "Line complete → rest are empty" auto-locking
       adPolicy.ts            # Interstitial cadence (pure)
@@ -65,7 +66,6 @@ src/
     env.ts                   # AdMob IDs and ads mode (test by default, live only in release builds)
     links.ts                 # Store URL, privacy policy URL, support email, web version URL
     version.ts               # App version, injected from package.json
-    demo.ts                  # Web build is a demo capped at the first 14 levels (`?demo` in dev)
   platform/
     native.ts                # Capacitor bootstrap, Android back button, foreground events
     back.ts                  # Back-handler stack: overlays first, then screens, then leave the app
@@ -84,10 +84,10 @@ src/
     App.tsx                  # View routing: home | tier | level, overlays, back handling, shared links
     shareCard.ts             # Draws the 1080×1350 share image on a canvas
     components/              # Board (the SVG board and all its touch input), boardLayout,
-                             # BeaverOverlay, HomeScreen, TierView, LevelCard, LevelGameView,
+                             # BeaverOverlay, HomeScreen, TierView, LevelGameView,
                              # MarkModeToggle, SubmitButton, HintButton, LastGuessSummary,
                              # RetryGate, WinScreen, TeachingHint, TutorialTour, RulesModal,
-                             # StatsModal, SettingsModal, GetAppModal, Splash, Wordmark,
+                             # StatsModal, SettingsModal, Splash, Wordmark,
                              # ErrorBoundary, icons
     hooks/                   # useGameState, useStats, useProgress, useRetry, useAudioFx,
                              # useBackHandler, useKeepAwake, useTheme, useTutorial
@@ -126,7 +126,7 @@ The rules as shipped (older notes described a different feedback model; these ar
 - Notes: the player can pencil a "ruled out" dash on any open cell (Rule out mode, or hold a cell; holding and then dragging pencils several). Notes are never judged and are cleared when the cell locks.
 - A loss does **not** reveal the answer: the retry is the same puzzle. An attempt (in progress or lost) is saved as its move list and replayed on return, so leaving a level is not a free restart.
 
-**Every puzzle is ambiguous from its sums alone.** Levels 1–63 have 4–15 grids consistent with their clues, with one exception: level 7, the last of the teaching set, has 70,287 (3,386 with its solved row), because its numbers have no extremes. Levels 64–210 have roughly 24,000–190,000 (the intended solution-count bands for the top three tiers were not reachable with their sum filter, so the bake fell back to unfiltered grids). Consequences worth knowing before changing balance: Advanced, Expert and Master are the same puzzle distribution and differ only by guess budget; and in those tiers even a perfect solver needs more than two guesses on about half the levels, so 3★ there is partly luck. `npm run check:levels -- --deep` prints the numbers.
+**Every puzzle is ambiguous from its sums alone.** Levels 1–63 have 4–15 grids consistent with their clues, with no exception since 2026-11-13: level 7 used to have 70,287 (its spec asked for no extreme sums, which no grid in the Beginner band has) and was replaced, before the first release, with a puzzle that has 6. That one line is the only change ever made to a baked level. Levels 64–210 have roughly 24,000–190,000 (the intended solution-count bands for the top three tiers were not reachable with their sum filter, so the bake fell back to unfiltered grids). Consequences worth knowing before changing balance: Advanced, Expert and Master are the same puzzle distribution and differ only by guess budget; and in those tiers even a perfect solver needs more than two guesses on about half the levels, so 3★ there is partly luck. `npm run check:levels -- --deep` prints the numbers.
 
 **Do not soften the top tiers with pre-solved cells.** A taper of extra pre-solved cells (12 at level 64 down to none at level 204) was built and removed on 2026-11-11. The owner's rule: a higher tier never starts with more help than a lower one (Beginner 2 cells, Intermediate 1, the rest none), and Expert is not to be made easier. Ask before proposing anything that changes how hard a tier is.
 
@@ -142,7 +142,7 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
 
 - **5 tiers**: Beginner, Intermediate, Advanced, Expert, Master.
 - **Uneven batches**: 4 / 5 / 6 / 7 / 8 batches of 7 levels each → 210 total levels.
-- **Teaching**: Beginner Batch 1 (levels 0–6) starts with one whole row pre-solved and shows a one-line tip per level (`TEACHING_TIPS` in `LevelGameView.tsx`). A new player is taught by the tour on level 1: see "Tutorial" below. The per-level `teachingHint` strings baked into `levels.json` predate the current rules and are not shown.
+- **Teaching**: Beginner Batch 1 (levels 0–6) starts with one whole row pre-solved and shows a one-line tip on levels 4 to 6 only (`TEACHING_TIPS` in `LevelGameView.tsx`; the tips the tour covers were cut on 2026-11-13). A new player is taught by the tour on level 1: see "Tutorial" below. The per-level `teachingHint` strings baked into `levels.json` predate the current rules and are not shown.
 - **Procedural**: Remaining 203 levels are generated to match a target difficulty score inside the tier's band, with progressive widening of tolerance.
 - **Scaffolding** (3★ = solved in at most 2 guesses):
   - Beginner: 5-guess budget, 2 pre-locked cells, 3★ ≤2, 2★ ≤3.
@@ -150,13 +150,18 @@ Solver (`solver.ts`) enumerates 6-bit row patterns with required popcount and ba
   - Advanced: 4 guesses, 0 pre-locks, 3★ ≤2, 2★ ≤3.
   - Expert: 3 guesses, 0 pre-locks, 3★ ≤2, 2★ for a win on the last guess.
   - Master: 3 guesses, 0 pre-locks — as Expert, but with near-trivial sum filter.
+- **Level list** (`TierView.tsx`): a stretch of the home map's trail. Each set is seven round stones on a dotted path, four out and three back: green for solved (stars beneath), gold and pulsing for the first unsolved level in the tier, plain for open, pale with a lock for a locked set. Capped at the level screen's width. Redesigned on 2026-11-13 at the owner's request ("something super nice").
+- **Replay**: the win screen offers "Replay" while the result is under three stars, for a rewarded ad (the owner's call on 2026-11-13: the puzzle is the same one with the answer just seen, so the better result is not free). The best result is what is kept.
+- **Daily puzzle** (`daily.ts`, built 2026-11-13): one puzzle per calendar day, the same for everyone, generated on the device from the date (no server). It plays as an Intermediate level (4 guesses, 1 pre-solved cell, 6 to 15 fitting grids) and has one attempt: no retry, no replay; hints are allowed. Results and the streak of days won are saved under `grid:v2:daily`, apart from level progress; attempts are saved like a level's under ids from 1,000,001 (`dailyLevelId`). The home card shows it once the player has had the tutorial, and shows the result instead until tomorrow. Never change how a date maps to a puzzle (`dailyPuzzle`): players compare results.
+- **Submit**: a guess with none of the player's own marks cannot be made (the button says "Mark some cells first"); a guess short of marks goes in with one tap and says how short ("Submit 19 of 21").
+- **Reset progress** (Settings, two taps): erases stars, stats, half-played levels, retry counts and "has had the tutorial". Sound, theme and the other settings stay.
+- **Web build**: the whole game. A 14-level demo with a "get the app" prompt existed until 2026-11-13, when the owner had it removed. Its ads are stand-ins that always pay out, so hints and retries are free there.
 - **Unlock**: Batches within a tier unlock sequentially (complete all 7 to unlock next). Tiers are all accessible from start. "Next" after a win never opens a locked set.
 - **Retry**: First attempt free. Losing grants 1 free instant retry per level. After that, each rewarded ad grants 2 more retries. A lost level stays lost (and gated) until retried; the answer is never shown.
 - **Stars**: Based on guess count of the winning attempt (first try or retry). Retries remain eligible for 3★.
 - **Hints**: 1 rewarded ad = 1 hint. A hint reveals a whole row or column: the one whose open cells could still be arranged in the most ways (`findHintLine`). The line is chosen when the ad pays out, from the board as it is then.
 - **Sharing**: the win screen shares the emoji result plus a link. Where the platform's share sheet takes files (mobile browsers), a 1080×1350 image of the unsolved puzzle with the result goes with it (`shareCard.ts`). In the Android app it is text and link only: handing an image to the native share sheet needs `@capacitor/filesystem`, which is not installed. The link is `VITE_WEB_URL/?level=N` when that is set, the store listing otherwise; the web version opens `?level=N` directly on that level.
 - **Ads**: banner app-wide (never before a new player has finished the tutorial), interstitial only on an explicit "Next" tap per `adPolicy.ts`, rewarded for hints and retries. The layout reserves banner height + safe area + a gap (`--bottom-reserve` in `globals.css`); no control may sit inside it.
-- **Web demo**: the public web build stops after level 14 (`demo.ts`); the app has no limit. A level past it raises the "get the app" prompt instead of opening, whichever way it was asked for: a card in a level list, a shared link, "Next" after level 14, PLAY once all 14 are solved. Four of the five tiers lie wholly past the demo and their lists do not say so, so the prompt's "Keep playing the demo" must lead somewhere playable: it opens the lowest unsolved demo level (the tutorial, on a first visit), or the Beginner list once all 14 are solved. Until 2026-11-12 it only closed the prompt, and the owner, trying the site as a new visitor, could not start a game. **The dev server has no limit either**, which is how that went unseen: add `?demo` to its address to get the demo, and give any change to how levels are opened a test in `tests/e2e/demo.spec.ts`.
 
 ## Tutorial
 
@@ -168,7 +173,7 @@ Built on 2026-11-12, after the owner watched people aged 7 to 30 fail to work ou
 - **Dark veil, lit cut-outs.** Everything but what the step is about is under a veil. The veil is one element with holes cut by `clip-path`; the holes let touches through, the rest takes them. Lit lines are either rows or a single column, so two holes never overlap (overlapping holes would fill in).
 - **Never dead.** An earlier version blocked touches with nothing on screen to show it, and on an iPad it read as the game being broken. Now a touch the tour does not take is always answered: the caption jolts (`nudge`), whether it landed on the veil or on a lit cell the step does not ask for. Skip is always on screen. Keep it that way.
 - **Only the lit cells take marks** (`only` on `Board`), and a hold does not pencil while guiding, so a step cannot go astray. Ruling out can be done either way: a button in the caption pencils the dashes one by one, or the player taps the cells of the lit line and each tap pencils one (the board is handed the pencil tool for that step).
-- **Words.** Ten at most per caption, checked by a unit test (the Plants vs. Zombies rule is eight). Captions say "beavers", which is what a found cell shows; the rest of the game still says "filled cells".
+- **Words.** Ten at most per caption, checked by a unit test (the Plants vs. Zombies rule is eight). Captions say "beavers", which is what a found cell shows, and so does the rest of the game ("16 beavers are hiding").
 - **Getting it back.** "Replay tutorial" in Settings and in the "?" sheet. A replay restarts level 1 clean and keeps earned stars.
 - **Measuring.** `tutorial_begin`, one `tutorial_step` per step shown (kind and position), `tutorial_complete` (skipped or not). The funnel shows where new players stop.
 - **Not on a phone yet.** The veil's cut-outs and touch pass-through are tested in Chromium and in Safari's engine, not on a device.

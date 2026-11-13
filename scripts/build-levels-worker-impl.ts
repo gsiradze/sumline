@@ -48,10 +48,12 @@ const TEACHING_BATCH: readonly TeachingSpec[] = [
     accept: p => p.rowSums.some(s => s === NEAR_FULL) && p.colSums.some(s => s === NEAR_FULL),
   },
   {
-    technique: 'balanced',
-    hint: 'No extremes here. Combine row and column clues to narrow the grid.',
-    accept: p =>
-      p.rowSums.every(s => s >= 2 && s <= 4) && p.colSums.every(s => s >= 2 && s <= 4),
+    // Until 2026-11-13 this was 'balanced' (every sum 2 to 4). No such grid fits
+    // the Beginner band, so the bake fell back to one with 70,287 answers: the
+    // seventh puzzle a new player met was the hardest in the first three tiers.
+    technique: 'mixed',
+    hint: 'Use everything so far: the rows and columns with a 1 or a 5 are where to start.',
+    accept: () => true,
   },
 ];
 

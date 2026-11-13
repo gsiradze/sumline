@@ -15,10 +15,16 @@ interface WinScreenProps {
   /** The number the player sees (1-based). */
   readonly levelNumber: number;
   readonly tierLabel: string;
+  /** "Daily #12" when this is the day's puzzle: one attempt, nothing after it. */
+  readonly dailyTitle?: string | null;
   readonly stars: Stars;
   /** Null when there is no next level to go to (locked set, or the last level). */
   readonly nextLevelNumber: number | null;
   readonly onNext: () => void;
+  /** Starts the level over, for an ad. Offered while there are stars still to earn. */
+  readonly onReplay: () => void;
+  /** The replay's ad is loading or showing. */
+  readonly replayPending: boolean;
   readonly onBack: () => void;
   /** True once Next has been pressed: everything is inert until the screen changes. */
   readonly busy: boolean;
@@ -31,24 +37,34 @@ export function WinScreen({
   state,
   levelNumber,
   tierLabel,
+  dailyTitle = null,
   stars,
   nextLevelNumber,
   onNext,
+  onReplay,
+  replayPending,
   onBack,
   busy,
 }: WinScreenProps) {
   const used = state.guesses.length;
   // The link opens this level on the web version when there is one; the store otherwise.
-  const link = levelLink(WEB_APP_URL, levelNumber);
+  const link = dailyTitle === null ? levelLink(WEB_APP_URL, levelNumber) : null;
   const shareText = useMemo(
-    () => generateShareText(state, { levelNumber, stars, url: link ?? PLAY_STORE_URL }),
-    [state, levelNumber, stars, link],
+    () =>
+      generateShareText(state, {
+        levelNumber,
+        title: dailyTitle ?? undefined,
+        stars,
+        url: link ?? PLAY_STORE_URL,
+      }),
+    [state, levelNumber, dailyTitle, stars, link],
   );
   const [copied, setCopied] = useState(false);
   // Drawn ahead of time: the share sheet must open straight from the tap.
   const cardRef = useRef<ShareImage | null>(null);
   useEffect(() => {
-    if (!canShareImages()) return;
+    // The share image names a level; a daily result is shared as text.
+    if (!canShareImages() || dailyTitle !== null) return;
     let cancelled = false;
     void renderShareCard({
       levelNumber,
@@ -67,7 +83,7 @@ export function WinScreen({
     return () => {
       cancelled = true;
     };
-  }, [levelNumber, tierLabel, state.puzzle, stars, used, link]);
+  }, [levelNumber, tierLabel, dailyTitle, state.puzzle, stars, used, link]);
   const headlineRef = useRef<HTMLHeadingElement | null>(null);
 
   // On short screens the result would otherwise sit under the fixed footer.
@@ -84,15 +100,15 @@ export function WinScreen({
   const handleShare = useCallback(async () => {
     const outcome = await shareOrCopy({
       text: shareText,
-      title: `Sumline #${levelNumber}`,
+      title: `Sumline ${dailyTitle ?? `#${levelNumber}`}`,
       image: cardRef.current,
     });
     shareResult('level', outcome);
     if (outcome === 'copied') setCopied(true);
-  }, [shareText, levelNumber]);
+  }, [shareText, levelNumber, dailyTitle]);
 
   const secondary =
-    'flex-1 h-11 rounded-[12px] bg-paper-50 border border-rule-200 text-ink-700 font-sans text-[14px] font-medium inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60';
+    'flex-1 h-11 rounded-[12px] bg-paper-50 border border-rule-200 text-ink-700 font-sans text-[14px] font-medium whitespace-nowrap inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60';
 
   return (
     <section
@@ -137,9 +153,29 @@ export function WinScreen({
             disabled={busy}
             className="w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold active:scale-[0.98] transition-transform duration-nudge shadow-sh-2 disabled:opacity-60"
           >
-            {nextLevelNumber !== null ? `Next · Level ${nextLevelNumber}` : 'Back to levels'}
+            {nextLevelNumber !== null
+              ? `Next · Level ${nextLevelNumber}`
+              : dailyTitle !== null
+                ? 'Done'
+                : 'Back to levels'}
           </button>
           <div className="mt-2.5 flex items-center gap-2.5">
+            {stars < 3 && dailyTitle === null && (
+              <button
+                type="button"
+                onClick={onReplay}
+                disabled={busy}
+                aria-label="Replay: watch an ad to play this level again"
+                className={secondary}
+              >
+                <span>{replayPending ? 'Loading ad…' : 'Replay'}</span>
+                {!replayPending && (
+                  <span className="font-mono text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded-[3px] bg-ochre-100 text-ochre-700">
+                    AD
+                  </span>
+                )}
+              </button>
+            )}
             <button type="button" onClick={handleShare} disabled={busy} className={secondary}>
               <ShareIcon className="w-4 h-4" />
               <span>{copied ? 'Copied' : 'Share result'}</span>

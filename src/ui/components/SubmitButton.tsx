@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { guessesUsed, markedCount } from '../../game/domain/game-state';
 import type { ActiveGameState } from '../../game/domain/game-state';
 import { GameOutcome } from '../../game/domain/types';
@@ -9,58 +8,32 @@ interface SubmitButtonProps {
   readonly disabled?: boolean;
 }
 
-const CONFIRM_WINDOW_MS = 4000;
-
 export function SubmitButton({ state, onSubmit, disabled }: SubmitButtonProps) {
   const marked = markedCount(state);
   const cap = state.puzzle.filledCount;
   const used = guessesUsed(state);
-  const [confirming, setConfirming] = useState(false);
-
-  // Any change to the board, or a short pause, withdraws the confirmation.
-  useEffect(() => {
-    setConfirming(false);
-  }, [marked, used]);
-  useEffect(() => {
-    if (!confirming) return;
-    const t = window.setTimeout(() => setConfirming(false), CONFIRM_WINDOW_MS);
-    return () => window.clearTimeout(t);
-  }, [confirming]);
 
   if (state.outcome !== GameOutcome.InProgress) return null;
 
   const over = marked - cap;
   const short = cap - marked;
   const next = used + 1;
-
-  // Marks of the player's own: a guess without any spends a turn and shows nothing.
+  // Marks of the player's own: a guess without any would spend a turn and show nothing.
   const own = state.currentMarks.some((mark, i) => mark === 1 && !state.lockedFilled[i]);
 
   let label = next === 1 ? 'Submit guess' : `Guess ${next} of ${state.guessBudget}`;
   if (over > 0) label = `Remove ${over} ${over === 1 ? 'mark' : 'marks'} to submit`;
-  else if (confirming) label = `Only ${marked} of ${cap} marked · submit anyway?`;
-  else if (short > 0 && own) label = `Submit ${marked} of ${cap}`;
-
-  const handleClick = (): void => {
-    if (over > 0) return;
-    // A short guess cannot win, but it is the player's to make: only an empty one asks first.
-    if (!own && short > 0 && !confirming) {
-      setConfirming(true);
-      return;
-    }
-    setConfirming(false);
-    onSubmit();
-  };
+  else if (!own) label = 'Mark some cells first';
+  // A short guess cannot win, but it is the player's to make.
+  else if (short > 0) label = `Submit ${marked} of ${cap}`;
 
   return (
     <button
       type="button"
       data-tour="submit"
-      onClick={handleClick}
-      disabled={disabled || over > 0}
-      className={`w-full h-[54px] rounded-[14px] text-paper-50 font-sans text-[16px] font-semibold tracking-[0.01em] shadow-sh-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fill-800/60 ${
-        confirming ? 'bg-clay-600' : 'bg-fill-800'
-      }`}
+      onClick={onSubmit}
+      disabled={disabled || over > 0 || !own}
+      className="w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold tracking-[0.01em] shadow-sh-2 active:scale-[0.98] transition-transform duration-nudge disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fill-800/60"
     >
       {label}
     </button>

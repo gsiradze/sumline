@@ -180,7 +180,7 @@ test('WinScreen does not appear on a wrong guess (visible DOM check)', async ({ 
 
   // The win screen's headline is "Solved in N." — it must not be in the DOM.
   await expect(page.getByText(/^Solved in \d/)).toHaveCount(0);
-  await expect(page.getByText('Guess 2 of 5')).toBeVisible();
+  await expect(page.getByText('Last guess · 1/5')).toBeVisible();
 });
 
 test('a guess that is short of marks goes in with one tap, and says how short', async ({
@@ -198,11 +198,13 @@ test('a guess that is short of marks goes in with one tap, and says how short', 
   expect((await getState(page)).guesses).toHaveLength(1);
 });
 
-test('a guess with no marks of the player’s own still asks first', async ({ page }) => {
+test('a guess with no marks of the player’s own cannot be made', async ({ page }) => {
   await openLevel(page, 3);
-  await page.getByRole('button', { name: 'Submit guess' }).click();
-  expect((await getState(page)).guesses).toHaveLength(0);
+  const button = page.getByRole('button', { name: 'Mark some cells first' });
+  await expect(button).toBeDisabled();
 
-  await page.getByRole('button', { name: /submit anyway\?/ }).click();
-  expect((await getState(page)).guesses).toHaveLength(1);
+  const s0 = await getState(page);
+  const open = [...Array(36).keys()].filter(i => !s0.lockedFilled[i] && !s0.lockedEmpty[i]);
+  await page.evaluate((idx: number) => window.__gridTest!.tapCell(idx), open[0]!);
+  await expect(page.getByRole('button', { name: /^Submit \d+ of \d+$/ })).toBeEnabled();
 });

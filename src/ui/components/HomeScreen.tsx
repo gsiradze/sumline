@@ -7,11 +7,12 @@ import {
   tierForLevelId,
   tierStars,
 } from '../../game/domain/levels';
+import type { DailyResult } from '../../game/domain/daily';
 import type { LevelProgressMap } from '../../game/domain/levels';
 import { TOTAL_LEVELS } from '../../game/domain/tiers';
 import { Tier } from '../../game/domain/types';
 import { TIER_PLACE_NAMES } from '../tierPlaces';
-import { GearIcon, MoonIcon, SpeakerOffIcon, SpeakerOnIcon, SunIcon } from './icons';
+import { FlameIcon, GearIcon, MoonIcon, SpeakerOffIcon, SpeakerOnIcon, SunIcon } from './icons';
 import { Wordmark } from './Wordmark';
 
 interface HomeScreenProps {
@@ -22,8 +23,20 @@ interface HomeScreenProps {
   readonly onToggleTheme: () => void;
   readonly onPickTier: (tier: Tier) => void;
   readonly onPickLevel: (levelId: number) => void;
+  /** The day's puzzle. Null until the player has had the tutorial. */
+  readonly daily: HomeDaily | null;
+  readonly onPlayDaily: () => void;
   readonly onOpenStats: () => void;
   readonly onOpenSettings: () => void;
+}
+
+export interface HomeDaily {
+  /** "Daily #12". */
+  readonly title: string;
+  /** Today's result, once there is one: the day has one attempt. */
+  readonly result: DailyResult | null;
+  /** Days solved in a row, as of today. */
+  readonly streak: number;
 }
 
 export function HomeScreen({
@@ -34,6 +47,8 @@ export function HomeScreen({
   onToggleTheme,
   onPickTier,
   onPickLevel,
+  daily,
+  onPlayDaily,
   onOpenStats,
   onOpenSettings,
 }: HomeScreenProps) {
@@ -75,6 +90,7 @@ export function HomeScreen({
           continueStars={continueStars}
           onPlay={() => onPickLevel(continueLevelId)}
         />
+        {daily && <DailyCard daily={daily} onPlay={onPlayDaily} />}
         <HomeTierMap
           progress={progress}
           currentTier={continueTier}
@@ -147,6 +163,46 @@ function TopBar({
       >
         <span aria-hidden="true" className="absolute -inset-x-2 -inset-y-2.5" />
         STATS
+      </button>
+    </div>
+  );
+}
+
+// The day's puzzle: open until it has been played, then its result until tomorrow.
+function DailyCard({ daily, onPlay }: { readonly daily: HomeDaily; readonly onPlay: () => void }) {
+  const { result, streak } = daily;
+  const status =
+    result === null
+      ? 'One try. New every day.'
+      : result.won
+        ? `Solved in ${result.guesses} · ${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)}`
+        : 'Missed today. Back tomorrow.';
+  return (
+    <div className="px-6 mt-1">
+      <button
+        type="button"
+        onClick={onPlay}
+        disabled={result !== null}
+        aria-label={`Daily puzzle, ${daily.title}`}
+        className="w-full min-h-[60px] rounded-[18px] border border-rule-200 bg-paper-50 shadow-sh-1 px-4 py-2.5 flex items-center justify-between gap-3 text-left active:scale-[0.98] transition-transform duration-nudge focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fill-800/60"
+      >
+        <span className="min-w-0">
+          <span className="block font-serif text-[16px] font-semibold leading-tight text-ink-900">
+            Daily puzzle
+            <span className="ml-2 font-mono text-[10px] font-normal tracking-[0.14em] uppercase text-ink-500">
+              {daily.title.replace('Daily ', '')}
+            </span>
+          </span>
+          <span className="block mt-0.5 font-sans text-[12px] text-ink-500">{status}</span>
+        </span>
+        <span
+          className={`shrink-0 inline-flex items-center gap-1 font-serif text-[15px] font-semibold tabular-nums ${
+            streak > 0 ? 'text-ochre-700' : 'text-ink-400'
+          }`}
+        >
+          <FlameIcon className="w-[18px] h-[18px]" />
+          {streak} {streak === 1 ? 'day' : 'days'}
+        </span>
       </button>
     </div>
   );

@@ -8,6 +8,8 @@ export interface UseStats {
   readonly hydrated: boolean;
   readonly onWin: (win: LevelWin) => void;
   readonly onLoss: () => void;
+  /** Forgets everything in memory. Erasing what is saved is the caller's job. */
+  readonly reset: () => void;
 }
 
 export function useStats(): UseStats {
@@ -42,5 +44,7 @@ export function useStats(): UseStats {
     });
   };
 
-  return { stats, hydrated, onWin, onLoss };
+  const reset = (): void => setStats(emptyStats);
+
+  return { stats, hydrated, onWin, onLoss, reset };
 }

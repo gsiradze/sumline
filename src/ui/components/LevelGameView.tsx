@@ -38,6 +38,7 @@ import { LineAxis, findHintLine } from '../../game/domain/hint';
 import { starsForWin } from '../../game/domain/stars';
 import { TUTORIAL_LEVEL_ID, TourStepKind, tourTargets } from '../../game/domain/tutorial';
 import type { Stars } from '../../game/domain/stars';
+import type { DailyResult } from '../../game/domain/daily';
 import { coordsForLevelId, isLevelAccessible, progressForLevel } from '../../game/domain/levels';
 import type { LevelProgressMap } from '../../game/domain/levels';
 import type { LevelWin } from '../../game/domain/stats';
@@ -62,18 +63,21 @@ interface LevelGameViewProps {
   readonly onReplayTutorial: () => void;
   /** The level a new player was headed for when the tutorial came first: "Next" leads there. */
   readonly resumeLevelId: number | null;
+  /** Set when the level is the day's puzzle: one attempt, recorded by day. */
+  readonly daily?: {
+    readonly title: string;
+    readonly onResult: (result: DailyResult) => void;
+  };
 }
 
 // One line per tutorial level. Each is true of every puzzle, not just this one.
-const TEACHING_TIPS: readonly string[] = [
-  'One row is done for you. Each number counts the filled cells in its row or column.',
-  'Right marks lock in green. Wrong marks turn into ✕ and stay ruled out.',
-  'When a row or column has all its filled cells, the rest are dashed out for you.',
-  'Sure a cell is empty? Switch to Rule out, or hold the cell, to pencil a dash.',
-  'You can only mark as many cells as are filled. Use every mark: each one tells you something.',
-  'Fewer guesses, more stars. Solve in two for all three.',
-  'No easy lines in this one. Make a careful first guess, then work from what locks in.',
-];
+// One line above the board on a few early levels, by level id. The tour on
+// level 1 teaches the rest, and people did not read a tip on every level.
+const TEACHING_TIPS: Readonly<Record<number, string>> = {
+  3: 'Sure a cell is empty? Switch to Rule out, or hold the cell, to pencil a dash.',
+  4: 'Use every mark: a wrong one costs nothing, and each one tells you something.',
+  5: 'Fewer guesses, more stars. Solve in two for all three.',
+};
 
 // Header buttons. Below 360 px wide everything in the header tightens a little
 // so four controls and the title still fit (tests/e2e/layout.spec.ts).
@@ -96,7 +100,10 @@ export function LevelGameView({
   onTutorialEnd,
   onReplayTutorial,
   resumeLevelId,
+  daily,
 }: LevelGameViewProps) {
+  const dailyRef = useRef(daily);
+  dailyRef.current = daily;
   const game = useGameState(level);
   useAudioFx(game.state, game.hydrated);
   useKeepAwake(game.state.outcome === GameOutcome.InProgress);
@@ -158,6 +165,16 @@ export function LevelGameView({
     if (game.restoredTerminal) return;
     const durationS = Math.round((Date.now() - mountedAtRef.current) / 1000);
     const used = game.state.guesses.length;
+    const today = dailyRef.current;
+    if (today) {
+      // Kept by day, not as a level: no stars toward a tier, no "levels completed".
+      const stars = outcome === GameOutcome.Won ? starsForWin(level.tier, used) : 0;
+      today.onResult({ won: outcome === GameOutcome.Won, guesses: used, stars });
+      if (outcome === GameOutcome.Won) {
+        onRecordStatsWin({ guessCount: used, stars, firstCompletion: false });
+      } else onRecordStatsLoss();
+      return;
+    }
     if (outcome === GameOutcome.Won) {
       const stars = starsForWin(level.tier, used);
       const firstCompletion = !progressForLevel(progressRef.current, level.id).completed;
@@ -223,6 +240,26 @@ export function LevelGameView({
     }
   }, [adBusy, applyHint, level.id]);
 
+  // Replaying a solved level is the same puzzle with the answer just seen, so
+  // the better result is not free: it costs an ad, as a hint does.
+  const handleReplay = useCallback(async () => {
+    if (adBusy) return;
+    setAdBusy(true);
+    try {
+      const outcome = await adProvider.showRewardedAd('replay');
+      adResult('replay', outcome);
+      if (outcome === 'error') {
+        setNotice('No ad available right now. Try again soon.');
+        return;
+      }
+      if (outcome !== 'granted') return;
+      noteAdShown(Date.now());
+      handleRetry();
+    } finally {
+      setAdBusy(false);
+    }
+  }, [adBusy, handleRetry]);
+
   const handleHeaderBack = useCallback(() => {
     const st = gameStateRef.current;
     if (st.outcome === GameOutcome.InProgress) {
@@ -248,7 +285,9 @@ export function LevelGameView({
   // "Next" only leads somewhere the player may go: the next set stays locked
   // until this one is complete. The win itself counts toward that. A new player
   // who was sent here for the tutorial goes on to the level they had picked.
-  const nextLevelId = resumeLevelId ?? (level.id + 1 < TOTAL_LEVELS ? level.id + 1 : null);
+  const nextLevelId = daily
+    ? null
+    : (resumeLevelId ?? (level.id + 1 < TOTAL_LEVELS ? level.id + 1 : null));
   const progressWithWin: LevelProgressMap = isWon
     ? { ...progress, [level.id]: { completed: true, bestGuessCount: used, stars } }
     : progress;
@@ -273,8 +312,8 @@ export function LevelGameView({
     })();
   }, [advancing, nextLevelId, stars, level.id, onGotoLevel]);
 
-  const { indexInBatch, batchIndexInTier } = coordsForLevelId(level.id);
-  const tip = level.id < TEACHING_TIPS.length ? TEACHING_TIPS[level.id] : level.teachingHint;
+  const coords = daily ? null : coordsForLevelId(level.id);
+  const tip = TEACHING_TIPS[level.id] ?? null;
   const inputBlocked = rulesOpen || adBusy || !game.hydrated;
   const tourStep = tutorial.step;
   const tourSpotlight = tourStep && {
@@ -311,13 +350,19 @@ export function LevelGameView({
           {/* One line high: where the set and level do not fit beside the tier
               name they wrap out of sight, and the name stays centred. */}
           <div className="h-[15px] overflow-hidden flex flex-wrap justify-center font-mono text-[10px] leading-[15px] tracking-[0.12em] uppercase text-ink-500 whitespace-nowrap">
-            <span>{config.label}</span>
-            <span>
-              {'\u00A0'}· {batchIndexInTier + 1}.{indexInBatch + 1}
-            </span>
+            {coords ? (
+              <>
+                <span>{config.label}</span>
+                <span>
+                  {'\u00A0'}· {coords.batchIndexInTier + 1}.{coords.indexInBatch + 1}
+                </span>
+              </>
+            ) : (
+              <span>One try a day</span>
+            )}
           </div>
           <h1 className="font-serif text-[22px] max-[359px]:text-[20px] font-medium leading-[1.15] tracking-[-0.01em] text-ink-900 mt-0.5">
-            Level {level.id + 1}
+            {daily ? daily.title : `Level ${level.id + 1}`}
           </h1>
         </div>
         <div className="flex items-center gap-2 max-[359px]:gap-1.5 shrink-0">
@@ -376,15 +421,38 @@ export function LevelGameView({
           state={game.state}
           levelNumber={level.id + 1}
           tierLabel={config.label}
+          dailyTitle={daily?.title ?? null}
           stars={stars}
           nextLevelNumber={nextOpen && nextLevelId !== null ? nextLevelId + 1 : null}
           onNext={handleNext}
+          onReplay={() => void handleReplay()}
+          replayPending={adBusy}
           onBack={onBack}
-          busy={advancing}
+          busy={advancing || adBusy}
         />
       )}
-      {isLost && (
+      {isLost && !daily && (
         <RetryGate state={game.state} retry={retry} onRetry={handleRetry} onBack={onBack} />
+      )}
+      {isLost && daily && (
+        <section className="px-4 pt-2 pb-5 text-center" role="status" aria-live="polite">
+          <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-clay-700">
+            Out of guesses
+          </div>
+          <h2 className="font-serif text-[26px] font-medium leading-[1.1] tracking-[-0.01em] text-ink-900 mt-1.5">
+            Not this time.
+          </h2>
+          <p className="mt-2 font-sans text-[13px] text-ink-500">A new puzzle arrives tomorrow.</p>
+          <div className="mx-auto mt-5 w-full max-w-md">
+            <button
+              type="button"
+              onClick={onBack}
+              className="w-full h-[54px] rounded-[14px] bg-fill-800 text-paper-50 font-sans text-[16px] font-semibold active:scale-[0.98] transition-transform duration-nudge shadow-sh-2"
+            >
+              Done
+            </button>
+          </div>
+        </section>
       )}
 
       {!isTerminal && (

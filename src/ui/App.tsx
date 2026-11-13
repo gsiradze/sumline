@@ -1,13 +1,12 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { ReactNode } from 'react';
 import { HomeScreen } from './components/HomeScreen';
 import { LevelGameView } from './components/LevelGameView';
 import { TierView } from './components/TierView';
 import { StatsModal } from './components/StatsModal';
 import { SettingsModal } from './components/SettingsModal';
-import { GetAppModal } from './components/GetAppModal';
 import { Splash } from './components/Splash';
-import { demoLevelLimit } from '../config/demo';
 import {
   getHapticsEnabled,
   getMusicEnabled,
@@ -16,6 +15,7 @@ import {
   getRulesShown,
   loadProgress,
   purgeLegacyKeys,
+  resetGameData,
   setRulesShown,
   setHapticsEnabled as persistHaptics,
   setMusicEnabled as persistMusic,
@@ -29,14 +29,17 @@ import { setHapticsEnabled } from '../game/audio/haptics';
 import { adResult, settingChanged, tutorialComplete } from '../telemetry/events';
 import { adProvider } from '../storage/ads';
 import { canShowInterstitial, noteAdShown, noteLevelComplete } from '../storage/adSession';
-import { bakedLevel } from '../storage/levelsManifest';
-import { firstIncompleteLevelId, isLevelAccessible, tierForLevelId } from '../game/domain/levels';
+import { bakedLevel, dailyLevel } from '../storage/levelsManifest';
+import { dailyNumber, dailyStreak } from '../game/domain/daily';
+import { isoDateLocal } from '../game/domain/stats';
+import { isLevelAccessible, tierForLevelId } from '../game/domain/levels';
 import { TUTORIAL_LEVEL_ID } from '../game/domain/tutorial';
 import type { Tier } from '../game/domain/types';
 import { Theme } from '../platform/theme';
 import { useProgress } from './hooks/useProgress';
 import { useStats } from './hooks/useStats';
 import { useTheme } from './hooks/useTheme';
+import { useDaily } from './hooks/useDaily';
 import { registerNav } from '../testHook';
 
 const MAX_BANNER_RESERVE_PX = 120;
@@ -46,6 +49,7 @@ const BANNER_GAP_PX = 16;
 type View =
   | { readonly kind: 'home' }
   | { readonly kind: 'tier'; readonly tier: Tier }
+  | { readonly kind: 'daily'; readonly iso: string }
   | {
       readonly kind: 'level';
       readonly levelId: number;
@@ -79,6 +83,7 @@ async function readTutorialDone(): Promise<boolean> {
 function viewKey(view: View): string {
   if (view.kind === 'level') return `level:${view.levelId}`;
   if (view.kind === 'tier') return `tier:${view.tier}`;
+  if (view.kind === 'daily') return `daily:${view.iso}`;
   return 'home';
 }
 
@@ -108,7 +113,6 @@ function Game() {
   const [view, setView] = useState<View>({ kind: 'home' });
   const [statsOpen, setStatsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [getAppOpen, setGetAppOpen] = useState(false);
   const [splashing, setSplashing] = useState(shouldShowSplash);
   // Counts replays of the tutorial, so level 1 starts afresh for each one.
   const [tourRuns, setTourRuns] = useState(0);
@@ -119,9 +123,23 @@ function Game() {
   tutorialDoneRef.current = tutorialDone;
   const viewRef = useRef(view);
   viewRef.current = view;
-  const { progress, recordLevelWin } = useProgress();
-  const { stats, hydrated: statsHydrated, onWin: onStatsWin, onLoss: onStatsLoss } = useStats();
+  const { progress, recordLevelWin, reset: resetProgress } = useProgress();
+  const {
+    stats,
+    hydrated: statsHydrated,
+    onWin: onStatsWin,
+    onLoss: onStatsLoss,
+    reset: resetStats,
+  } = useStats();
   const { theme, toggleTheme } = useTheme();
+  const { record: daily, recordResult: recordDailyResult, reset: resetDaily } = useDaily();
+  // The player's calendar day, looked at again whenever they come back to the app.
+  const [today, setToday] = useState(() => isoDateLocal());
+  useEffect(() => {
+    const refresh = (): void => setToday(isoDateLocal());
+    document.addEventListener('visibilitychange', refresh);
+    return () => document.removeEventListener('visibilitychange', refresh);
+  }, []);
   const [muted, setMutedState] = useState(false);
   const [hapticsOn, setHapticsOn] = useState(true);
   const [musicOn, setMusicOn] = useState(true);
@@ -241,16 +259,11 @@ function Game() {
   }, []);
 
   /**
-   * Opens a level unless the web demo ends before it. A new player is taken
+   * Opens a level. A new player is taken
    * through the tutorial on level 1 first, whichever level they asked for and
    * however they asked (the level list, a shared link): there is one tutorial.
    */
   const openLevel = useCallback((levelId: number): void => {
-    const limit = demoLevelLimit();
-    if (limit !== null && levelId >= limit) {
-      setGetAppOpen(true);
-      return;
-    }
     if (tutorialDoneRef.current === null) {
       void readTutorialDone().then(done => {
         if (tutorialDoneRef.current === null) {
@@ -275,19 +288,6 @@ function Game() {
     [openLevel],
   );
 
-  // The prompt can sit over a list in which every level is past the demo, so
-  // "Keep playing the demo" has to lead somewhere playable: the next demo level
-  // not solved yet (the tutorial, on a first visit), or the demo's own level
-  // list once all of it is solved.
-  const handleKeepPlayingDemo = useCallback(() => {
-    setGetAppOpen(false);
-    const limit = demoLevelLimit();
-    if (limit === null) return;
-    const next = firstIncompleteLevelId(progressRef.current);
-    if (next < limit) openLevel(next);
-    else setView({ kind: 'tier', tier: tierForLevelId(0) });
-  }, [openLevel]);
-
   // A shared link (`?level=37`) opens straight on its level. The address is
   // then cleaned, so a reload or the back button behaves as usual.
   useEffect(() => {
@@ -301,11 +301,6 @@ function Game() {
   // and nowhere else: never from a timer, never while the app is in the background.
   const handleAdvanceLevel = useCallback(
     async (nextLevelId: number, opts?: { readonly skipAd?: boolean }): Promise<boolean> => {
-      const limit = demoLevelLimit();
-      if (limit !== null && nextLevelId >= limit) {
-        setGetAppOpen(true);
-        return false;
-      }
       // The level a new player was headed for when the tutorial came first was
       // already theirs to open (a shared link opens any level).
       const current = viewRef.current;
@@ -356,6 +351,24 @@ function Game() {
     setView({ kind: 'level', levelId: TUTORIAL_LEVEL_ID });
   }, []);
 
+  // Starts the game from scratch: stars, stats, half-played levels and the
+  // tutorial. Sound, theme and the other settings are the player's and stay.
+  const handleResetProgress = useCallback(() => {
+    // The level on screen saves its attempt as it closes: close it first, so
+    // that save is erased with the rest.
+    flushSync(() => {
+      setSettingsOpen(false);
+      setView({ kind: 'home' });
+    });
+    tutorialDoneRef.current = false;
+    setTutorialDone(false);
+    resetProgress();
+    resetStats();
+    resetDaily();
+    void resetGameData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetProgress, resetDaily]);
+
   const handleBackToTier = useCallback(() => {
     setView(v => {
       if (v.kind === 'level') {
@@ -382,6 +395,16 @@ function Game() {
         onToggleTheme={toggleTheme}
         onPickTier={handlePickTier}
         onPickLevel={handlePickLevel}
+        daily={
+          tutorialDone
+            ? {
+                title: `Daily #${dailyNumber(today)}`,
+                result: daily.results[today] ?? null,
+                streak: dailyStreak(daily, today),
+              }
+            : null
+        }
+        onPlayDaily={() => setView({ kind: 'daily', iso: today })}
         onOpenStats={() => setStatsOpen(true)}
         onOpenSettings={handleOpenSettings}
       />
@@ -393,6 +416,29 @@ function Game() {
         progress={progress}
         onBack={handleBackToHome}
         onPickLevel={handlePickLevel}
+      />
+    );
+  } else if (view.kind === 'daily') {
+    const { iso } = view;
+    screen = (
+      <LevelGameView
+        key={`daily:${iso}`}
+        level={dailyLevel(iso)}
+        progress={progress}
+        onRecordWin={recordLevelWin}
+        onRecordStatsWin={onStatsWin}
+        onRecordStatsLoss={onStatsLoss}
+        onBack={handleBackToHome}
+        onGotoLevel={handleAdvanceLevel}
+        onOpenSettings={handleOpenSettings}
+        runTutorial={false}
+        onTutorialEnd={handleTutorialEnd}
+        onReplayTutorial={handleReplayTutorial}
+        resumeLevelId={null}
+        daily={{
+          title: `Daily #${dailyNumber(iso)}`,
+          onResult: result => recordDailyResult(iso, result),
+        }}
       />
     );
   } else {
@@ -433,14 +479,8 @@ function Game() {
           onToggleTheme={toggleTheme}
           stats={stats}
           onReplayTutorial={handleReplayTutorial}
+          onResetProgress={handleResetProgress}
           onDismiss={() => setSettingsOpen(false)}
-        />
-      )}
-      {getAppOpen && (
-        <GetAppModal
-          demoLevels={demoLevelLimit() ?? 0}
-          onKeepPlaying={handleKeepPlayingDemo}
-          onDismiss={() => setGetAppOpen(false)}
         />
       )}
       {splashing && <Splash onDone={() => setSplashing(false)} />}
